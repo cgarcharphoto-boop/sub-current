@@ -1,0 +1,3 @@
+page 543 KB | gzip 263 KB
+desktop  main-thread busy  442.1 ms/s | script   75.2 ms/s | fps  59.0 | hero offscreen busy  430.6 ms/s | heap 2.5 MB
+phone    main-thread busy  362.3 ms/s | script   67.0 ms/s | fps  60.0 | hero offscreen busy  365.1 ms/s | heap 1.9 MB
