@@ -4,6 +4,12 @@ Live after deploy: https://subcurrent-app-prototype.vercel.app (Vercel) and http
 
 A clickable prototype of a Subcurrent fan app and owner portal. It opens on the first show: **Re:Turnal Nights**, Downright & Subcurrent, October 23–24, 2026, Denver, sound by VOID. It is one static page in `docs/` with no build step.
 
+## Three views
+
+- **Fan app:** shows, tickets, location drops, feed, messages, artist players.
+- **Teams portal:** the crew's phone. Takeover pings for tasks, breaks, incidents and capacity; channel chat per department; push-to-talk walkie with transcripts; the door scanner with a live headcount that triggers a venue-wide capacity hold; run of show; roster.
+- **Owner portal:** money, P&L, team pay, fans, Broadcast (one post to Facebook, Instagram, X and the app) and Ops dispatch in Messages (one-tap alerts, tasks, live acknowledgements, incident log).
+
 ## The 3D layer
 
 - 3D waveform hero: the Subcurrent logo rebuilt as a field of spikes over a scrolling grid floor. It sways, pulses to the beat when a SoundCloud track plays, and turns when you drag it.
