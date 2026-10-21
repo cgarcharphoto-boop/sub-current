@@ -7,3 +7,6 @@ test-results/
 # local-only secrets written by the seed script
 .owner-credentials
 .railway-link/
+backend/.agents/
+backend/.claude/
+backend/skills-lock.json

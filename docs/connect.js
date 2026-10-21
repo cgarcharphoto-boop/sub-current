@@ -12,7 +12,7 @@
 (function () {
   'use strict';
 
-  var API_BASE = 'https://subcurrent-backend.vercel.app';
+  var API_BASE = 'https://sub-current-8t66.vercel.app';
   try { API_BASE = localStorage.getItem('sc_api') || API_BASE; } catch (e) {}
 
   // App event id -> backend slug, and app tier id -> backend tier name.
