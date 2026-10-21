@@ -26,6 +26,12 @@ model Fan {
   likes        PostLike[]
   comments     Comment[]
   thread       Thread?
+  handle       String?  @unique // public @name for fan-to-fan messages; null = not findable
+  pollVotes    PollVote[]
+  reports      Report[]
+  dmSent       DirectMessage[]
+  blocking     Block[]  @relation("blocker")
+  blockedBy    Block[]  @relation("blocked")
 }
 
 model Owner {
@@ -35,6 +41,7 @@ model Owner {
   name         String
   role         String   @default("staff") // "staff" | "admin"
   createdAt    DateTime @default(now())
+  tokenVersion Int      @default(0) // bump to sign out every session (e.g. password change)
 }
 
 model Artist {
@@ -172,10 +179,17 @@ model Post {
   text       String
   eventSlug  String?
   pinned     Boolean    @default(false)
-  status     String     @default("visible") // visible | removed
+  status     String     @default("visible") // visible | held | removed
+  heldReason String?
+  appKey     String?    @unique // id of the matching post in the front-end prototype
+  imageData  String?    // data URL (jpeg/png/webp), size-capped by the API
+  pollJson   String?    // JSON array of option labels
+  reportCount Int       @default(0)
   createdAt  DateTime   @default(now())
   likes      PostLike[]
   comments   Comment[]
+  pollVotes  PollVote[]
+  reports    Report[]
 
   @@index([status, createdAt])
 }
@@ -229,4 +243,65 @@ model Message {
   createdAt  DateTime @default(now())
 
   @@index([threadId, createdAt])
+}
+
+model PollVote {
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId    String
+  fan       Fan      @relation(fields: [fanId], references: [id], onDelete: Cascade)
+  fanId     String
+  option    Int
+  createdAt DateTime @default(now())
+
+  @@id([postId, fanId])
+}
+
+model Report {
+  id        String   @id @default(cuid())
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId    String
+  fan       Fan      @relation(fields: [fanId], references: [id], onDelete: Cascade)
+  fanId     String
+  reason    String
+  createdAt DateTime @default(now())
+
+  @@unique([postId, fanId])
+}
+
+// ---- Fan <-> fan direct messages ----
+// aId < bId (sorted) so each pair has exactly one conversation.
+model DirectThread {
+  id        String          @id @default(cuid())
+  aId       String
+  bId       String
+  aUnread   Int             @default(0)
+  bUnread   Int             @default(0)
+  updatedAt DateTime        @updatedAt
+  messages  DirectMessage[]
+
+  @@unique([aId, bId])
+  @@index([aId])
+  @@index([bId])
+}
+
+model DirectMessage {
+  id        String       @id @default(cuid())
+  thread    DirectThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  threadId  String
+  sender    Fan          @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  senderId  String
+  text      String
+  createdAt DateTime     @default(now())
+
+  @@index([threadId, createdAt])
+}
+
+model Block {
+  blocker   Fan      @relation("blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blockerId String
+  blocked   Fan      @relation("blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+  blockedId String
+  createdAt DateTime @default(now())
+
+  @@id([blockerId, blockedId])
 }

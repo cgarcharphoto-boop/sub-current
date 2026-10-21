@@ -2,7 +2,7 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { prisma } from '../db.js';
-import { sign } from '../middleware/auth.js';
+import { sign, requireOwner, requireFan } from '../middleware/auth.js';
 import { asyncRoute } from '../middleware/errors.js';
 
 export const authRouter = Router();
@@ -25,7 +25,7 @@ authRouter.post(
       data: { email: body.email, passwordHash, name: body.name, phone: body.phone },
     });
     const token = sign({ sub: fan.id, kind: 'fan' });
-    res.status(201).json({ token, fan: { id: fan.id, name: fan.name, email: fan.email } });
+    res.status(201).json({ token, fan: { id: fan.id, name: fan.name, email: fan.email, handle: fan.handle } });
   })
 );
 
@@ -40,7 +40,7 @@ authRouter.post(
       return res.status(401).json({ error: 'Invalid email or password' });
     }
     const token = sign({ sub: fan.id, kind: 'fan' });
-    res.json({ token, fan: { id: fan.id, name: fan.name, email: fan.email } });
+    res.json({ token, fan: { id: fan.id, name: fan.name, email: fan.email, handle: fan.handle } });
   })
 );
 
@@ -55,10 +55,10 @@ authRouter.post(
     const fan = await prisma.fan.upsert({
       where: { email },
       update: {},
-      create: { email, name: 'Alex R.', passwordHash: await bcrypt.hash(`demo-${Date.now()}`, 4) },
+      create: { email, name: 'Alex R.', handle: 'alex.demo', passwordHash: await bcrypt.hash(`demo-${Date.now()}`, 4) },
     });
     const token = sign({ sub: fan.id, kind: 'fan' });
-    res.json({ token, fan: { id: fan.id, name: fan.name, email: fan.email } });
+    res.json({ token, fan: { id: fan.id, name: fan.name, email: fan.email, handle: fan.handle } });
   })
 );
 
@@ -70,7 +70,58 @@ authRouter.post(
     if (!owner || !(await bcrypt.compare(body.password, owner.passwordHash))) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
-    const token = sign({ sub: owner.id, kind: 'owner', role: owner.role });
+    const token = sign({ sub: owner.id, kind: 'owner', role: owner.role, v: owner.tokenVersion });
     res.json({ token, owner: { id: owner.id, name: owner.name, role: owner.role } });
+  })
+);
+
+const passwordSchema = z.object({ current: z.string(), next: z.string().min(12).max(200) });
+
+// Changing the password signs out every other session (tokenVersion bump)
+// and returns a fresh token for this one.
+authRouter.post(
+  '/owner/password',
+  requireOwner,
+  asyncRoute(async (req, res) => {
+    const body = passwordSchema.parse(req.body);
+    const owner = await prisma.owner.findUnique({ where: { id: req.auth.sub } });
+    if (!(await bcrypt.compare(body.current, owner.passwordHash))) {
+      // 400, not 401: the session is fine, only the typed password is wrong.
+      return res.status(400).json({ error: 'Current password is wrong' });
+    }
+    const updated = await prisma.owner.update({
+      where: { id: owner.id },
+      data: { passwordHash: await bcrypt.hash(body.next, 12), tokenVersion: { increment: 1 } },
+    });
+    const token = sign({ sub: updated.id, kind: 'owner', role: updated.role, v: updated.tokenVersion });
+    res.json({ token });
+  })
+);
+
+// ---- fan profile: the handle other fans use to find and message you ----
+const HANDLE = /^[a-z0-9._]{3,24}$/;
+const handleSchema = z.object({ handle: z.string().trim().toLowerCase().regex(HANDLE, '3-24 letters, numbers, dots or underscores') });
+
+authRouter.get(
+  '/fan/me',
+  requireFan,
+  asyncRoute(async (req, res) => {
+    const fan = await prisma.fan.findUnique({ where: { id: req.auth.sub } });
+    if (!fan) return res.status(401).json({ error: 'Account not found. Sign in again.' });
+    res.json({ id: fan.id, name: fan.name, email: fan.email, handle: fan.handle });
+  })
+);
+
+authRouter.patch(
+  '/fan/me',
+  requireFan,
+  asyncRoute(async (req, res) => {
+    const body = handleSchema.parse(req.body);
+    const fan = await prisma.fan.findUnique({ where: { id: req.auth.sub } });
+    if (!fan) return res.status(401).json({ error: 'Account not found. Sign in again.' });
+    const taken = await prisma.fan.findUnique({ where: { handle: body.handle } });
+    if (taken && taken.id !== fan.id) return res.status(409).json({ error: 'That handle is taken' });
+    const updated = await prisma.fan.update({ where: { id: fan.id }, data: { handle: body.handle } });
+    res.json({ id: updated.id, name: updated.name, email: updated.email, handle: updated.handle });
   })
 );

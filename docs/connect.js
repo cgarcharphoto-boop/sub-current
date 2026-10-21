@@ -119,8 +119,8 @@
       '#sc-body input,#sc-body select{width:100%;box-sizing:border-box;background:#15101F;color:#EEE8FF;border:1px solid rgba(238,232,255,.26);border-radius:10px;padding:9px 10px;font:14px -apple-system,system-ui,sans-serif;margin:0 0 8px}',
       '#sc-body .row{display:flex;gap:8px}',
       '#sc-body .row>*{flex:1}',
-      '#sc-body button.b{background:#C99BFF;color:#040307;border:0;border-radius:10px;padding:9px 12px;font:700 13px -apple-system,system-ui,sans-serif;cursor:pointer;width:100%;margin:0 0 8px}',
-      '#sc-body button.g{background:none;color:#EEE8FF;border:1px solid rgba(238,232,255,.26)}',
+      '#sc-body .b{display:block;box-sizing:border-box;background:#C99BFF;color:#040307;border:0;border-radius:10px;padding:9px 12px;font:700 13px -apple-system,system-ui,sans-serif;cursor:pointer;width:100%;margin:0 0 8px}',
+      '#sc-body .b.g{background:none;color:#EEE8FF;border:1px solid rgba(238,232,255,.26)}',
       '#sc-body button:disabled{opacity:.5;cursor:default}',
       '#sc-body .card{background:#15101F;border:1px solid rgba(238,232,255,.12);border-radius:12px;padding:12px;margin:0 0 8px}',
       '#sc-body .code{font:700 26px/1.1 "JetBrains Mono",ui-monospace,monospace;letter-spacing:.12em;color:#C99BFF;margin:6px 0}',
@@ -350,9 +350,12 @@
     if (!owner) { body('<p>Sign in to see real sales, publish shows, and read flyers.</p>' + ownerLoginForm()); return; }
     body('<div class="kv"><span>Signed in as <b>' + esc(owner.name) + '</b></span><span class="muted">' + esc(owner.role) + '</span></div>' +
       '<h3>Dashboard</h3><div class="stats" id="sc-o-stats"><div><b>–</b>Fans</div><div><b>–</b>Shows live</div><div><b>–</b>Check-ins</div></div>' +
-      inboxHtml() + '<h3>Shows</h3><div id="sc-o-events">Loading\u2026</div>' +
+      inboxHtml() + '<h3>Needs review</h3><div id="sc-mod">Loading\u2026</div>' + '<h3>Shows</h3><div id="sc-o-events">Loading\u2026</div>' +
       '<h3>Read a flyer</h3><p class="muted">' + (health && health.integrations.flyerAi ? 'Claude reads the flyer and fills in the show details.' : 'AI flyer reading is in sample mode until an Anthropic key is added.') + '</p>' +
       '<input id="sc-o-flyer" type="file" accept="image/*"><div id="sc-o-flyerres">' + (flyerResult ? '<pre>' + esc(JSON.stringify(flyerResult, null, 2)) + '</pre>' : '') + '</div>' +
+      '<h3>Change owner password</h3><input id="sc-pw-cur" type="password" placeholder="Current password" autocomplete="current-password">' +
+      '<input id="sc-pw-new" type="password" placeholder="New password, 12+ characters" autocomplete="new-password">' +
+      '<button class="b g" data-sc="changepw">Change password</button><p class="muted">Changing it signs out every other owner session.</p>' +
       '<button class="b g" data-sc="owner-logout" style="margin-top:8px">Sign out</button>');
     ownerApi('/owner/dashboard').then(function (d) {
       var el = $('#sc-o-stats');
@@ -360,7 +363,8 @@
     }).catch(function () {});
     loadOwnerEvents();
     loadInbox();
-    startPoll(loadInbox, 5000);
+    loadModeration();
+    startPoll(function () { loadInbox(); loadModeration(); }, 5000);
     var f = $('#sc-o-flyer');
     if (f) f.onchange = function () { readFlyer(f.files[0]); };
   }
@@ -430,25 +434,87 @@
   // ----- Feed tab -----
   var feedPosts = [];
   var openComments = {}; // postId -> true
+  var openReport = null; // postId with the report picker open
+  var draft = { photo: null, poll: false, opts: ['', ''] };
   function feedCall(path, opts) {
-    // Reads work signed out; a fan token adds liked/mine.
+    // Reads work signed out; a fan token adds liked/mine/vote and your held posts.
     if (!opts && !fan) return api(path);
     return fanApi(path, opts);
   }
-  function renderFeed() {
+
+  // Shrinks a photo to fit the API's size cap (longest side 1280px, JPEG).
+  function compressImage(src) {
+    return new Promise(function (resolve, reject) {
+      var img = new Image();
+      img.onload = function () {
+        var max = 1280, w = img.naturalWidth, h = img.naturalHeight;
+        var scale = Math.min(1, max / Math.max(w, h));
+        var c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(w * scale)); c.height = Math.max(1, Math.round(h * scale));
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        var q = 0.85, out = c.toDataURL('image/jpeg', q);
+        while (out.length > 650000 && q > 0.4) { q -= 0.1; out = c.toDataURL('image/jpeg', q); }
+        if (out.length > 650000) return reject(new Error('Photo is too large'));
+        resolve(out);
+      };
+      img.onerror = function () { reject(new Error('That file is not a photo this browser can read')); };
+      img.src = src;
+    });
+  }
+  function fileToDataUrl(file) {
+    return new Promise(function (resolve, reject) {
+      var r = new FileReader();
+      r.onload = function () { resolve(String(r.result)); };
+      r.onerror = function () { reject(new Error('Could not read that file')); };
+      r.readAsDataURL(file);
+    });
+  }
+
+  function composerHtml() {
     var asTeam = Boolean(owner);
-    body('<h3>New post</h3><textarea id="sc-p-text" maxlength="1000" placeholder="Say something to the Subcurrent crowd"></textarea>' +
+    return '<h3>New post</h3><textarea id="sc-p-text" maxlength="1000" placeholder="Say something to the Subcurrent crowd"></textarea>' +
+      (draft.photo ? '<div style="position:relative;margin:0 0 8px"><img src="' + esc(draft.photo) + '" alt="Photo to post" style="width:100%;border-radius:10px;display:block"><button class="b g" data-sc="nophoto" style="position:absolute;top:6px;right:6px;width:auto;background:#040307cc">Remove</button></div>' : '') +
+      (draft.poll ? '<div id="sc-p-poll">' + draft.opts.map(function (o, i) { return '<input data-popt="' + i + '" maxlength="80" placeholder="Option ' + (i + 1) + '" value="' + esc(o) + '">'; }).join('') +
+        (draft.opts.length < 4 ? '<button class="b g" data-sc="addopt">Add an option</button>' : '') + '</div>' : '') +
+      '<div class="row"><label class="b g" style="text-align:center;margin:0 0 8px">Photo<input type="file" accept="image/*" id="sc-p-photo" hidden></label>' +
+      '<button class="b g" data-sc="togglepoll" aria-pressed="' + draft.poll + '">' + (draft.poll ? 'No poll' : 'Poll') + '</button></div>' +
       '<select id="sc-p-show"><option value="">No show tagged</option>' + Object.keys(SLUG_TITLE).map(function (k) { return '<option value="' + k + '">' + esc(SLUG_TITLE[k]) + '</option>'; }).join('') + '</select>' +
       (asTeam ? '<label class="ck"><input type="checkbox" id="sc-p-team" checked> Post as Subcurrent (owner)</label><label class="ck"><input type="checkbox" id="sc-p-pin"> Pin to top</label><label class="ck"><input type="checkbox" id="sc-p-push"> Send push to all fans</label>' : '') +
       '<button class="b" data-sc="post">Post</button>' +
-      '<p class="muted">' + (asTeam ? 'With the box checked, posts and comments go out as Subcurrent. Uncheck it to post as ' + esc(fan ? fan.name : 'the demo fan') + '.' : (!fan || fan.demo ? 'Posting as the demo fan, Alex R. Sign in on the Tickets tab to post as yourself.' : 'Posting as ' + esc(fan.name) + '.')) + '</p>' +
-      '<h3>Feed</h3><div id="sc-feed">Loading…</div>');
+      '<p class="muted">' + (asTeam ? 'With the box checked, posts and comments go out as Subcurrent. Uncheck it to post as ' + esc(fan ? fan.name : 'the demo fan') + '.' : (!fan || fan.demo ? 'Posting as the demo fan, Alex R. Sign in on the Tickets tab to post as yourself.' : 'Posting as ' + esc(fan.name) + '.')) +
+      ' Posts that look like ticket resale wait for the team to review them.</p>';
+  }
+  function saveDraftFields() {
+    document.querySelectorAll('[data-popt]').forEach(function (i) { draft.opts[+i.getAttribute('data-popt')] = i.value; });
+  }
+  function renderFeed() {
+    body('<div id="sc-composer">' + composerHtml() + '</div><h3>Feed</h3><div id="sc-feed">Loading…</div>');
+    wireComposer();
     loadFeed();
     startPoll(function () {
       var a = document.activeElement;
-      if (a && a.closest && a.closest('#sc-feed')) return;
+      if (openReport || (a && a.closest && a.closest('#sc-feed'))) return;
       loadFeed(true);
     }, 15000);
+  }
+  function redrawComposer() {
+    var text = val('sc-p-text'), show = val('sc-p-show');
+    saveDraftFields();
+    var el = $('#sc-composer');
+    if (!el) return;
+    el.innerHTML = composerHtml();
+    $('#sc-p-text').value = text;
+    $('#sc-p-show').value = show;
+    wireComposer();
+  }
+  function wireComposer() {
+    var f = $('#sc-p-photo');
+    if (f) f.onchange = function () {
+      if (!f.files[0]) return;
+      fileToDataUrl(f.files[0]).then(compressImage)
+        .then(function (d) { draft.photo = d; redrawComposer(); })
+        .catch(function (e) { toast(e.message, true); });
+    };
   }
   function loadFeed(quiet) {
     return feedCall('/feed').then(function (d) {
@@ -456,19 +522,38 @@
       drawFeed();
     }).catch(function (e) { if (!quiet) { var el = $('#sc-feed'); if (el) el.innerHTML = '<p class="bad">' + esc(e.message) + '</p>'; } });
   }
+  function pollHtml(p) {
+    var total = p.poll.votes.reduce(function (a, b) { return a + b; }, 0);
+    return '<div style="margin:0 0 8px">' + p.poll.options.map(function (o, i) {
+      var pct = total ? Math.round(p.poll.votes[i] * 100 / total) : 0;
+      var mine = p.poll.mine === i;
+      return '<button data-sc="vote" data-v="' + esc(p.id) + ':' + i + '" aria-pressed="' + mine + '" style="position:relative;display:block;width:100%;text-align:left;background:#0D0A14;border:1px solid ' + (mine ? '#C99BFF' : 'rgba(238,232,255,.18)') + ';border-radius:10px;padding:8px 10px;margin:0 0 6px;color:#EEE8FF;font:14px -apple-system,system-ui,sans-serif;cursor:pointer;overflow:hidden">' +
+        '<span style="position:absolute;inset:0;width:' + pct + '%;background:rgba(201,155,255,.16)"></span><span style="position:relative">' + esc(o) + (mine ? ' ✓' : '') + '</span><span style="position:relative;float:right" class="muted">' + pct + '%</span></button>';
+    }).join('') + '<p class="muted">' + total + ' vote' + (total === 1 ? '' : 's') + (p.poll.mine == null ? '. Tap to vote.' : '. Tap another option to change your vote.') + '</p></div>';
+  }
+  var REPORT_REASONS = ['Ticket scam or resale', 'Spam', 'Harassment or hate', 'Something else'];
   function drawFeed() {
     var el = $('#sc-feed');
     if (!el) return;
     if (!feedPosts.length) { el.innerHTML = '<p class="muted">No posts yet. Start the conversation.</p>'; return; }
     el.innerHTML = feedPosts.map(function (p) {
+      var held = p.status === 'held';
       var canRemove = p.mine || Boolean(owner);
-      return '<div class="post' + (p.pinned ? ' pin' : '') + '" data-post="' + esc(p.id) + '">' +
+      var canReport = !p.mine && !held;
+      return '<div class="post' + (p.pinned ? ' pin' : '') + '" data-post="' + esc(p.id) + '"' + (held ? ' style="opacity:.7"' : '') + '>' +
         '<div class="who">' + esc(p.author) + (p.fromTeam ? ' <span class="badge">TEAM</span>' : '') + (p.pinned ? ' <span class="muted">Pinned</span>' : '') + '<span class="t">' + ago(p.createdAt) + '</span></div>' +
-        '<div class="txt">' + esc(p.text) + '</div>' +
+        (held ? '<p class="warn" style="font-size:12px">Held for review. Only you can see this until the team approves it. ' + esc(p.heldReason || '') + '</p>' : '') +
+        (p.text ? '<div class="txt">' + esc(p.text) + '</div>' : '') +
+        (p.image ? '<img src="' + esc(API_BASE + p.image) + '" alt="Photo from ' + esc(p.author) + '" loading="lazy" style="width:100%;border-radius:10px;display:block;margin:0 0 8px">' : '') +
+        (p.poll ? pollHtml(p) : '') +
         (p.eventSlug && SLUG_TITLE[p.eventSlug] ? '<p class="muted">' + esc(SLUG_TITLE[p.eventSlug]) + '</p>' : '') +
-        '<div class="acts"><button data-sc="like" data-v="' + esc(p.id) + '" class="' + (p.liked ? 'on' : '') + '" aria-pressed="' + p.liked + '">♥ ' + p.likes + '</button>' +
-        '<button data-sc="cms" data-v="' + esc(p.id) + '">Comments ' + p.comments + '</button>' +
+        '<div class="acts">' + (held ? '' : '<button data-sc="like" data-v="' + esc(p.id) + '" class="' + (p.liked ? 'on' : '') + '" aria-pressed="' + p.liked + '">♥ ' + p.likes + '</button>' +
+        '<button data-sc="cms" data-v="' + esc(p.id) + '">Comments ' + p.comments + '</button>') +
+        (canReport ? '<button data-sc="report" data-v="' + esc(p.id) + '">Report</button>' : '') +
         (canRemove ? '<button data-sc="rmpost" data-v="' + esc(p.id) + '">Remove</button>' : '') + '</div>' +
+        (openReport === p.id ? '<div class="cms"><p class="muted">Why are you reporting this?</p>' + REPORT_REASONS.map(function (r) {
+          return '<button class="b g" data-sc="reportwhy" data-v="' + esc(p.id) + '|' + esc(r) + '">' + esc(r) + '</button>';
+        }).join('') + '</div>' : '') +
         (openComments[p.id] ? '<div class="cms" id="sc-cms-' + esc(p.id) + '">Loading…</div>' : '') + '</div>';
     }).join('');
     Object.keys(openComments).forEach(loadComments);
@@ -477,8 +562,8 @@
     api('/feed/' + encodeURIComponent(id) + '/comments').then(function (list) {
       var el = document.getElementById('sc-cms-' + id);
       if (!el) return;
-      var draft = el.querySelector('input');
-      var keep = draft ? draft.value : '';
+      var d = el.querySelector('input');
+      var keep = d ? d.value : '';
       el.innerHTML = list.map(function (c) {
         return '<p class="cm"><b>' + esc(c.author) + '</b>' + (c.fromTeam ? ' <span class="badge">TEAM</span>' : '') + ' ' + esc(c.text) + ' <span class="muted">' + ago(c.createdAt) + '</span></p>';
       }).join('') + '<div class="row"><input data-cmin="' + esc(id) + '" maxlength="500" placeholder="Add a comment"><button class="b" style="flex:.35" data-sc="addcm" data-v="' + esc(id) + '">Send</button></div>';
@@ -487,27 +572,49 @@
   }
   function postAs(text, slug, opts) {
     opts = opts || {};
-    var payload = { text: text };
+    var payload = { text: text || '' };
     if (slug) payload.eventSlug = slug;
-    if (opts.team) {
-      payload.pinned = Boolean(opts.pin);
-      payload.notify = Boolean(opts.push);
-      return ownerApi('/feed', { method: 'POST', body: payload });
+    if (opts.image) payload.image = opts.image;
+    if (opts.poll && opts.poll.length >= 2) payload.poll = opts.poll;
+    var send = function () {
+      if (opts.team) {
+        payload.pinned = Boolean(opts.pin);
+        payload.notify = Boolean(opts.push);
+        return ownerApi('/feed', { method: 'POST', body: payload });
+      }
+      return fanApi('/feed', { method: 'POST', body: payload });
+    };
+    // Re-compress if a caller hands over a big photo (e.g. from the app's composer).
+    if (payload.image && payload.image.length > 650000) {
+      return compressImage(payload.image).then(function (d) { payload.image = d; return send(); });
     }
-    return fanApi('/feed', { method: 'POST', body: payload });
+    return send();
+  }
+  function postedToast(r, prefix) {
+    var p = r.post || {};
+    if (p.status === 'held') return toast((prefix || 'Posted') + ', but it is held for review: ' + (p.heldReason || 'the team will check it') + '.', true);
+    toast((prefix || 'Posted to the live feed') + (r.push && r.push.sent ? '. Push sent to ' + r.push.sent + ' device' + (r.push.sent === 1 ? '' : 's') + '.' : '.'));
   }
 
-  // ----- Messages tab (fan <-> Subcurrent team) -----
-  var fanUnread = 0, teamUnread = 0;
+  // ----- Messages tab -----
+  // Two kinds: the fan's conversation with the Subcurrent team, and direct
+  // messages with other fans (found by @handle).
+  var teamUnreadFan = 0, dmUnread = 0, teamUnread = 0;
+  var msgView = load('msgview') || 'team';
+  var dmWith = null; // handle of the open fan conversation
   function bubbles(list, mineIsTeam) {
     if (!list.length) return '<p class="muted">No messages yet.</p>';
     return list.map(function (m) {
-      var me = mineIsTeam ? m.fromTeam : !m.fromTeam;
-      return '<div class="bub' + (me ? ' me' : '') + '">' + esc(m.text) + '<small>' + esc(me ? 'You' : m.author) + ' · ' + ago(m.createdAt) + '</small></div>';
+      var me = m.mine != null ? m.mine : (mineIsTeam ? m.fromTeam : !m.fromTeam);
+      return '<div class="bub' + (me ? ' me' : '') + '">' + esc(m.text) + '<small>' + esc(me ? 'You' : (m.author || '')) + (me || m.author ? ' · ' : '') + ago(m.createdAt) + '</small></div>';
     }).join('');
   }
   function renderMsgs() {
-    body('<h3>Message the Subcurrent team</h3><p class="muted">Questions about tickets, entry, or the shows. The team answers from the owner portal.' +
+    var seg = '<div class="row" role="tablist" style="margin:0 0 12px">' +
+      '<button class="b' + (msgView === 'team' ? '' : ' g') + '" data-sc="msgview" data-v="team" aria-selected="' + (msgView === 'team') + '">Subcurrent team' + (teamUnreadFan ? ' (' + teamUnreadFan + ')' : '') + '</button>' +
+      '<button class="b' + (msgView === 'fans' ? '' : ' g') + '" data-sc="msgview" data-v="fans" aria-selected="' + (msgView === 'fans') + '">Fans' + (dmUnread ? ' (' + dmUnread + ')' : '') + '</button></div>';
+    if (msgView === 'fans') return renderDms(seg);
+    body(seg + '<p class="muted">Questions about tickets, entry, or the shows. The team answers from the owner portal.' +
       (!fan || fan.demo ? ' You are the demo fan, Alex R. Sign in on the Tickets tab to message as yourself.' : '') + '</p>' +
       '<div class="chat" id="sc-chat">Loading…</div>' +
       '<div class="row"><input id="sc-m-in" maxlength="2000" placeholder="Write a message"><button class="b" style="flex:.35" data-sc="sendmsg">Send</button></div>');
@@ -518,7 +625,7 @@
   }
   function loadChat() {
     return fanApi('/messages').then(function (d) {
-      fanUnread = 0; badge();
+      teamUnreadFan = 0; badge();
       var el = $('#sc-chat');
       if (!el) return;
       var atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
@@ -534,6 +641,100 @@
     fanApi('/messages', { method: 'POST', body: { text: text } })
       .then(function () { return loadChat(); })
       .then(function () { var el = $('#sc-chat'); if (el) el.scrollTop = el.scrollHeight; })
+      .catch(function (e) { inp.value = text; toast('Message not sent: ' + e.message, true); });
+  }
+
+  // ----- fan-to-fan direct messages -----
+  function refreshMe() {
+    return fanApi('/auth/fan/me').then(function (m) { fan.handle = m.handle; save('fan', fan); return fan; });
+  }
+  function renderDms(seg) {
+    body(seg + '<div id="sc-dm">Loading…</div>');
+    ensureFan().then(refreshMe).then(function () {
+      if (!fan.handle) return drawHandleForm();
+      if (dmWith) return openDm(dmWith);
+      drawDmList();
+    }).catch(function (e) { var el = $('#sc-dm'); if (el) el.innerHTML = '<p class="bad">' + esc(e.message) + '</p>'; });
+  }
+  function drawHandleForm() {
+    var el = $('#sc-dm');
+    if (!el) return;
+    el.innerHTML = '<p>Pick a handle so other fans can find and message you.</p><input id="sc-h-in" maxlength="24" placeholder="handle, like maya.rails" autocapitalize="off">' +
+      '<button class="b" data-sc="sethandle">Save handle</button><p class="muted">3 to 24 letters, numbers, dots or underscores.</p>';
+  }
+  function drawDmList() {
+    stopPoll();
+    var el = $('#sc-dm');
+    if (!el) return;
+    el.innerHTML = '<p class="muted">You are <b>@' + esc(fan.handle) + '</b>. <button class="b g" data-sc="edithandle" style="width:auto;padding:4px 8px;margin:0">Change</button></p>' +
+      '<input id="sc-dm-q" placeholder="Find a fan by @handle or name" autocomplete="off"><div id="sc-dm-res"></div><h3>Conversations</h3><div id="sc-dm-list">Loading…</div>';
+    var q = $('#sc-dm-q'), t;
+    q.oninput = function () { clearTimeout(t); t = setTimeout(function () { searchFans(q.value); }, 250); };
+    loadDmList();
+    startPoll(loadDmList, 8000);
+  }
+  function searchFans(q) {
+    var res = $('#sc-dm-res');
+    if (!res) return;
+    if (q.trim().length < 2) { res.innerHTML = ''; return; }
+    fanApi('/dms/search?q=' + encodeURIComponent(q.trim())).then(function (list) {
+      res.innerHTML = list.length ? list.map(function (f) {
+        return '<button class="th" data-sc="opendm" data-v="' + esc(f.handle) + '"><span><b>' + esc(f.name) + '</b> <span class="muted">@' + esc(f.handle) + '</span></span><span class="muted">Message</span></button>';
+      }).join('') : '<p class="muted">No fans match. They need to pick a handle first.</p>';
+    }).catch(function (e) { res.innerHTML = '<p class="bad">' + esc(e.message) + '</p>'; });
+  }
+  function loadDmList() {
+    return fanApi('/dms').then(function (list) {
+      var el = $('#sc-dm-list');
+      if (!el) return;
+      dmUnread = list.reduce(function (n, t) { return n + t.unread; }, 0); badge();
+      el.innerHTML = list.length ? list.map(function (t) {
+        return '<button class="th" data-sc="opendm" data-v="' + esc(t.handle || '') + '"' + (t.handle ? '' : ' disabled') + '><span><b>' + esc(t.name) + '</b> <span class="muted">@' + esc(t.handle || '') + '</span><br><span class="muted">' + esc((t.last.mine ? 'You: ' : '') + t.last.text.slice(0, 60)) + '</span></span>' +
+          (t.unread ? '<span class="n">' + t.unread + '</span>' : '<span class="muted">' + ago(t.last.createdAt) + '</span>') + '</button>';
+      }).join('') : '<p class="muted">No conversations yet. Search for a fan above.</p>';
+    }).catch(function () {});
+  }
+  function openDm(handle) {
+    dmWith = handle;
+    stopPoll();
+    var el = $('#sc-dm');
+    if (!el) return Promise.resolve();
+    el.innerHTML = 'Loading…';
+    var first = true;
+    function load() {
+      return fanApi('/dms/with/' + encodeURIComponent(handle)).then(function (d) {
+        var box = $('#sc-dm');
+        if (!box || dmWith !== handle) return;
+        var chat = box.querySelector('.chat');
+        if (!chat || first) {
+          box.innerHTML = '<button class="b g" data-sc="closedm">← All conversations</button>' +
+            '<div class="kv"><span><b>' + esc(d.with.name) + '</b> <span class="muted">@' + esc(d.with.handle) + '</span></span>' +
+            '<button class="b g" style="width:auto;margin:0;padding:4px 10px" data-sc="' + (d.iBlocked ? 'unblock' : 'block') + '" data-v="' + esc(d.with.handle) + '">' + (d.iBlocked ? 'Unblock' : 'Block') + '</button></div>' +
+            '<div class="chat" style="margin-top:8px"></div>' +
+            (d.blocked ? '<p class="muted">' + (d.iBlocked ? 'You blocked this fan. Unblock to message again.' : 'You can’t message this fan.') + '</p>' :
+              '<div class="row"><input id="sc-dm-in" maxlength="2000" placeholder="Message @' + esc(d.with.handle) + '"><button class="b" style="flex:.35" data-sc="senddm">Send</button></div>');
+          chat = box.querySelector('.chat');
+          var inp = $('#sc-dm-in');
+          if (inp) inp.onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); sendDm(); } };
+          first = false;
+        }
+        var atBottom = chat.scrollHeight - chat.scrollTop - chat.clientHeight < 40;
+        chat.innerHTML = bubbles(d.messages);
+        if (atBottom || chat.dataset.n !== String(d.messages.length)) chat.scrollTop = chat.scrollHeight;
+        chat.dataset.n = String(d.messages.length);
+        checkUnread();
+      }).catch(function (e) { toast(e.message, true); dmWith = null; drawDmList(); });
+    }
+    startPoll(load, 5000);
+    return load();
+  }
+  function sendDm() {
+    var inp = $('#sc-dm-in');
+    var text = inp && inp.value.trim();
+    if (!text || !dmWith) return;
+    inp.value = '';
+    fanApi('/dms/with/' + encodeURIComponent(dmWith), { method: 'POST', body: { text: text } })
+      .then(function () { return openDm(dmWith); })
       .catch(function (e) { inp.value = text; toast('Message not sent: ' + e.message, true); });
   }
 
@@ -587,11 +788,27 @@
       .catch(function (e) { inp.value = text; toast('Reply not sent: ' + e.message, true); });
   }
 
+  // ----- Owner moderation queue -----
+  function loadModeration() {
+    if (!owner) return Promise.resolve();
+    return ownerApi('/owner/moderation').then(function (list) {
+      var el = $('#sc-mod');
+      if (!el) return;
+      el.innerHTML = list.length ? list.map(function (p) {
+        return '<div class="post"><div class="who">' + esc(p.author) + '<span class="t">' + ago(p.createdAt) + '</span></div>' +
+          '<p class="warn" style="font-size:12px">' + esc(p.heldReason || 'Held') + (p.reports && p.reports.length ? '. Reasons: ' + esc(p.reports.join(', ')) : '') + '</p>' +
+          (p.text ? '<div class="txt">' + esc(p.text) + '</div>' : '') +
+          (p.image ? '<img src="' + esc(API_BASE + p.image) + '" alt="" style="width:100%;border-radius:10px;margin:0 0 8px">' : '') +
+          '<div class="row"><button class="b" data-sc="modapprove" data-v="' + esc(p.id) + '">Approve</button><button class="b g" data-sc="modremove" data-v="' + esc(p.id) + '">Remove</button></div></div>';
+      }).join('') : '<p class="muted">Nothing waiting. Held resale posts and posts reported by 3 fans show up here.</p>';
+    }).catch(function () {});
+  }
+
   // ----- unread badge on the Live pill -----
   function badge() {
     var pill = $('#sc-pill');
     if (!pill) return;
-    var n = fanUnread + teamUnread;
+    var n = teamUnreadFan + dmUnread + teamUnread;
     var el = pill.querySelector('.n');
     if (!n) { if (el) el.remove(); pill.removeAttribute('aria-label'); return; }
     if (!el) { el = document.createElement('span'); el.className = 'n'; pill.appendChild(el); }
@@ -600,7 +817,10 @@
   }
   function checkUnread() {
     if (document.hidden) return;
-    if (fan) api('/messages/unread', null, fan.token).then(function (d) { fanUnread = d.unread; badge(); }).catch(function () {});
+    if (fan) {
+      api('/messages/unread', null, fan.token).then(function (d) { teamUnreadFan = d.unread; badge(); }).catch(function () {});
+      api('/dms/unread', null, fan.token).then(function (d) { dmUnread = d.unread; badge(); }).catch(function () {});
+    }
     if (owner) api('/owner/inbox', null, owner.token).then(function (l) { teamUnread = l.reduce(function (n, t) { return n + t.unread; }, 0); badge(); }).catch(function () {});
   }
 
@@ -659,7 +879,7 @@
         .then(function (d) { fan = { token: d.token, name: d.fan.name, email: d.fan.email, demo: false }; save('fan', fan); toast((signup ? 'Account created. ' : '') + 'Signed in as ' + d.fan.name + '.'); render(); })
         .catch(function (err) { b.disabled = false; toast(err.status === 400 ? 'Check the email, and use a password of 8 or more characters.' : err.message, true); });
     }
-    if (act === 'fan-logout') { fan = null; save('fan', null); fanUnread = 0; badge(); toast('Signed out. Back to the demo fan.'); return render(); }
+    if (act === 'fan-logout') { fan = null; save('fan', null); teamUnreadFan = 0; dmUnread = 0; dmWith = null; badge(); toast('Signed out. Back to the demo fan.'); return render(); }
     if (act === 'owner-login') {
       b.disabled = true;
       return api('/auth/owner/login', { method: 'POST', body: { email: val('sc-o-email'), password: $('#sc-o-pass').value } })
@@ -682,17 +902,72 @@
     if (act === 'publish') { b.disabled = true; return publish(v); }
     if (act === 'post') {
       var text = val('sc-p-text');
-      if (!text) return toast('Write something first.', true);
+      saveDraftFields();
+      var pollOpts = draft.poll ? draft.opts.map(function (o) { return o.trim(); }).filter(Boolean) : null;
+      if (draft.poll && pollOpts.length < 2) return toast('Add at least two poll options.', true);
+      if (!text && !draft.photo && !pollOpts) return toast('Write something, add a photo, or add a poll.', true);
       var team = $('#sc-p-team') && $('#sc-p-team').checked;
       b.disabled = true;
-      return postAs(text, val('sc-p-show'), { team: team, pin: $('#sc-p-pin') && $('#sc-p-pin').checked, push: $('#sc-p-push') && $('#sc-p-push').checked })
+      return postAs(text, val('sc-p-show'), { team: team, pin: $('#sc-p-pin') && $('#sc-p-pin').checked, push: $('#sc-p-push') && $('#sc-p-push').checked, image: draft.photo, poll: pollOpts })
         .then(function (r) {
+          draft = { photo: null, poll: false, opts: ['', ''] };
+          redrawComposer();
           $('#sc-p-text').value = '';
-          toast('Posted to the live feed' + (r.push && r.push.sent ? '. Push sent to ' + r.push.sent + ' device' + (r.push.sent === 1 ? '' : 's') + '.' : '.'));
+          postedToast(r);
           return loadFeed();
         })
         .catch(function (err) { toast('Post failed: ' + err.message, true); })
+        .then(function () { var btn = document.querySelector('[data-sc="post"]'); if (btn) btn.disabled = false; });
+    }
+    if (act === 'nophoto') { draft.photo = null; return redrawComposer(); }
+    if (act === 'togglepoll') { saveDraftFields(); draft.poll = !draft.poll; return redrawComposer(); }
+    if (act === 'addopt') { saveDraftFields(); if (draft.opts.length < 4) draft.opts.push(''); return redrawComposer(); }
+    if (act === 'vote') {
+      var vp = v.split(':');
+      return fanApi('/feed/' + encodeURIComponent(vp[0]) + '/vote', { method: 'POST', body: { option: Number(vp[1]) } }).then(function (r) {
+        feedPosts.forEach(function (p) { if (p.id === vp[0]) p.poll = r; });
+        drawFeed();
+      }).catch(function (err) { toast(err.message, true); });
+    }
+    if (act === 'report') { openReport = openReport === v ? null : v; return drawFeed(); }
+    if (act === 'reportwhy') {
+      var rp = v.split('|');
+      openReport = null;
+      return fanApi('/feed/' + encodeURIComponent(rp[0]) + '/report', { method: 'POST', body: { reason: rp[1] } })
+        .then(function (r) { toast(r.already ? 'You already reported this post.' : 'Reported. The team will review it.'); return loadFeed(); })
+        .catch(function (err) { toast(err.message, true); drawFeed(); });
+    }
+    if (act === 'modapprove' || act === 'modremove') {
+      b.disabled = true;
+      return ownerApi('/owner/moderation/' + encodeURIComponent(v), { method: 'POST', body: { action: act === 'modapprove' ? 'approve' : 'remove' } })
+        .then(function () { toast(act === 'modapprove' ? 'Approved. It is live in the feed.' : 'Removed.'); return loadModeration(); })
+        .catch(function (err) { b.disabled = false; toast(err.message, true); });
+    }
+    if (act === 'changepw') {
+      var cur = $('#sc-pw-cur').value, nxt = $('#sc-pw-new').value;
+      if (nxt.length < 12) return toast('Use at least 12 characters for the new password.', true);
+      b.disabled = true;
+      return ownerApi('/auth/owner/password', { method: 'POST', body: { current: cur, next: nxt } })
+        .then(function (r) { owner.token = r.token; save('owner', owner); $('#sc-pw-cur').value = ''; $('#sc-pw-new').value = ''; toast('Password changed. Other owner sessions are signed out.'); })
+        .catch(function (err) { toast(/Current password/.test(err.message) ? 'Current password is wrong.' : err.message, true); })
         .then(function () { b.disabled = false; });
+    }
+    if (act === 'msgview') { msgView = v; dmWith = null; save('msgview', v); return render(); }
+    if (act === 'sethandle') {
+      var h = val('sc-h-in').toLowerCase().replace(/^@/, '');
+      b.disabled = true;
+      return fanApi('/auth/fan/me', { method: 'PATCH', body: { handle: h } })
+        .then(function (m) { fan.handle = m.handle; save('fan', fan); toast('You are @' + m.handle + '.'); drawDmList(); })
+        .catch(function (err) { b.disabled = false; toast(err.status === 400 ? 'Use 3 to 24 letters, numbers, dots or underscores.' : err.message, true); });
+    }
+    if (act === 'edithandle') { stopPoll(); drawHandleForm(); var hi = $('#sc-h-in'); if (hi) hi.value = fan.handle || ''; return; }
+    if (act === 'opendm') return openDm(v);
+    if (act === 'closedm') { dmWith = null; return drawDmList(); }
+    if (act === 'senddm') return sendDm();
+    if (act === 'block' || act === 'unblock') {
+      return fanApi('/dms/block/' + encodeURIComponent(v), { method: act === 'block' ? 'POST' : 'DELETE' })
+        .then(function () { toast(act === 'block' ? 'Blocked @' + v + '. They can’t message you or find you.' : 'Unblocked @' + v + '.'); return openDm(v); })
+        .catch(function (err) { toast(err.message, true); });
     }
     if (act === 'like') {
       return fanApi('/feed/' + encodeURIComponent(v) + '/like', { method: 'POST' }).then(function (r) {
@@ -755,14 +1030,18 @@
       }).catch(function () {});
     }
 
-    // Fan composer "Post": mirror the text to the real shared feed.
-    if (act === 'post') {
+    // Fan composer "Post": mirror text, photo and poll to the real shared feed.
+    if (act === 'post' && !b.closest('#sc-panel')) {
       var cp = document.getElementById('cpText');
-      var ptext = cp && cp.value.trim();
+      var ptext = cp ? cp.value.trim() : '';
       var pshow = document.getElementById('cpShow');
-      if (ptext) {
-        postAs(ptext, EVENT_SLUG[pshow && pshow.value] || null)
-          .then(function () { toast('Also posted to the live feed. Everyone using the app can see it.'); if (tab === 'feed') loadFeed(true); })
+      var ph = document.querySelector('#sheet .cp-photo .ph');
+      var pm = ph && (ph.getAttribute('style') || '').match(/url\(["']?(data:image\/[^"')]+)["']?\)/);
+      var pphoto = pm ? pm[1] : null;
+      var popts = Array.prototype.map.call(document.querySelectorAll('#sheet [data-cpopt]'), function (i) { return i.value.trim(); }).filter(Boolean);
+      if (ptext || pphoto || popts.length >= 2) {
+        postAs(ptext, EVENT_SLUG[pshow && pshow.value] || null, { image: pphoto, poll: popts.length >= 2 ? popts : null })
+          .then(function (r) { postedToast(r, 'Also posted to the live feed'); appCounts.at = 0; if (tab === 'feed') loadFeed(true); })
           .catch(function (err) { toast('Live feed post failed: ' + err.message, true); });
       }
     }
@@ -784,12 +1063,55 @@
       }
     }
 
+    // Likes, poll votes and reports on the app's built-in posts go to the
+    // matching server posts (seeded under the same ids).
+    if (act === 'like' && !b.closest('#sc-panel')) {
+      var lk = b.getAttribute('data-v');
+      appPost(lk).then(function (p) {
+        if (!p) return;
+        return fanApi('/feed/' + encodeURIComponent(p.id) + '/like', { method: 'POST' }).then(function (r) {
+          p.liked = r.liked; p.likes = r.likes; syncAppCounts(true);
+        });
+      }).catch(function (err) { toast('Real like failed: ' + err.message, true); });
+    }
+    if (act === 'vote' && !b.closest('#sc-panel')) {
+      var vt = (b.getAttribute('data-v') || '').split(':');
+      appPost(vt[0]).then(function (p) {
+        if (!p || !p.poll) return;
+        return fanApi('/feed/' + encodeURIComponent(p.id) + '/vote', { method: 'POST', body: { option: Number(vt[1]) } })
+          .then(function (r) { p.poll = r; toast('Vote counted for real. ' + r.votes.reduce(function (x, y) { return x + y; }, 0) + ' real votes so far.'); });
+      }).catch(function (err) { toast('Real vote failed: ' + err.message, true); });
+    }
+    if (act === 'reportwhy' && !b.closest('#sc-panel')) {
+      var rw = (b.getAttribute('data-v') || '').split('|');
+      if (rw[0] && rw[0].indexOf('dm:') !== 0) {
+        appPost(rw[0]).then(function (p) {
+          if (p) return fanApi('/feed/' + encodeURIComponent(p.id) + '/report', { method: 'POST', body: { reason: rw[1] || 'Reported in app' } });
+        }).catch(function () {});
+      }
+    }
+
     // "My tickets" in the app: nudge toward the real ones.
     if (act === 'viewtickets' || (act === 'tab' && b.getAttribute('data-v') === 'tickets')) {
       fanApi('/tickets/mine').then(function (list) {
         if (list.length) toast('You have ' + list.length + ' real ticket' + (list.length === 1 ? '' : 's') + ' with live door codes. Tap Live to see them.');
       }).catch(function () {});
     }
+  }, true);
+
+  // Comments typed under the app's built-in posts go to the server post too.
+  document.addEventListener('submit', function (e) {
+    var f = e.target;
+    if (!health || !f.matches || !f.matches('form[data-form="sendcm"]')) return;
+    var inp = f.querySelector('input.input');
+    var text = inp && inp.value.trim();
+    var key = f.getAttribute('data-v');
+    if (!text || !key) return;
+    appPost(key).then(function (p) {
+      if (!p) return;
+      return fanApi('/feed/' + encodeURIComponent(p.id) + '/comments', { method: 'POST', body: { text: text } })
+        .then(function () { p.comments++; syncAppCounts(true); });
+    }).catch(function (err) { toast('Real comment failed: ' + err.message, true); });
   }, true);
 
   // The app's chat with Subcurrent (thread "th-cbh") also goes to the real
@@ -805,7 +1127,51 @@
       .catch(function (err) { toast('Real message failed: ' + err.message, true); });
   }, true);
 
-  // Replace the app's simulated "N left\" with real remaining counts whenever
+  // Real like/comment counts on the app's built-in posts. The app's numbers
+  // are demo data; once the server post exists these show real activity.
+  var appCounts = { at: 0, byKey: {}, pending: null };
+  function fetchAppCounts(keys) {
+    if (appCounts.pending) return appCounts.pending;
+    appCounts.pending = feedCall('/feed/by-app-keys?keys=' + encodeURIComponent(keys.join(',')))
+      .then(function (m) { Object.keys(m).forEach(function (k) { appCounts.byKey[k] = m[k]; }); appCounts.at = Date.now(); return appCounts.byKey; })
+      .finally(function () { appCounts.pending = null; });
+    return appCounts.pending;
+  }
+  function appPost(key) {
+    if (!key || !/^p\d+$/.test(key)) return Promise.resolve(null);
+    if (appCounts.byKey[key]) return Promise.resolve(appCounts.byKey[key]);
+    return fetchAppCounts([key]).then(function (m) { return m[key] || null; });
+  }
+  function fmtCount(n) { return n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1).replace(/\.0$/, '') + 'K' : String(n); }
+  function syncAppCounts(force) {
+    if (!health) return;
+    var likeBtns = document.querySelectorAll('[data-act="like"][data-v^="p"]');
+    if (!likeBtns.length) return;
+    var keys = [];
+    likeBtns.forEach(function (bn) { var k = bn.getAttribute('data-v'); if (/^p\d+$/.test(k) && keys.indexOf(k) < 0) keys.push(k); });
+    var stale = force || Date.now() - appCounts.at > 20000 || keys.some(function (k) { return !(k in appCounts.byKey); });
+    var apply = function () {
+      keys.forEach(function (k) {
+        var p = appCounts.byKey[k];
+        if (!p) return;
+        document.querySelectorAll('[data-act="like"][data-v="' + k + '"]').forEach(function (bn) {
+          var num = bn.querySelector('.num');
+          var want = fmtCount(p.likes);
+          if (num && num.textContent !== want) num.textContent = want;
+          if (bn.classList.contains('liked') !== p.liked) bn.classList.toggle('liked', p.liked);
+          if (bn.getAttribute('aria-pressed') !== String(p.liked)) bn.setAttribute('aria-pressed', String(p.liked));
+        });
+        document.querySelectorAll('[data-act="comments"][data-v="' + k + '"] .num').forEach(function (num) {
+          var want = fmtCount(p.comments);
+          if (num.textContent !== want) num.textContent = want;
+        });
+      });
+    };
+    apply();
+    if (stale && !appCounts.pending) fetchAppCounts(keys).then(apply).catch(function () {});
+  }
+
+  // Replace the app's simulated "N left" with real remaining counts whenever
   // the checkout sheet renders.
   function syncSheetInventory() {
     if (!health) return;
@@ -836,7 +1202,14 @@
       if (!h) return;
       health = h;
       mount();
-      new MutationObserver(function () { syncSheetInventory(); }).observe(document.body, { childList: true, subtree: true });
+      var syncQueued = false;
+      new MutationObserver(function () {
+        syncSheetInventory();
+        if (syncQueued) return;
+        syncQueued = true;
+        requestAnimationFrame(function () { syncQueued = false; syncAppCounts(false); });
+      }).observe(document.body, { childList: true, subtree: true });
+      syncAppCounts(true);
       checkUnread();
       setInterval(checkUnread, 30000);
     })

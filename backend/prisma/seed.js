@@ -1,19 +1,38 @@
 import bcrypt from 'bcryptjs';
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { PrismaClient } from '@prisma/client';
+
+// The owner password is never committed. Set OWNER_PASSWORD to choose one;
+// otherwise a strong random password is generated and written to
+// .owner-credentials at the repo root (git-ignored), never printed.
+function ownerPassword() {
+  if (process.env.OWNER_PASSWORD) return { value: process.env.OWNER_PASSWORD, generated: false };
+  return { value: crypto.randomBytes(15).toString('base64url'), generated: true };
+}
+const credsFile = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../.owner-credentials');
 
 const prisma = new PrismaClient();
 
 async function main() {
-  const owner = await prisma.owner.upsert({
-    where: { email: 'owner@subcurrent.app' },
-    update: {},
-    create: {
-      email: 'owner@subcurrent.app',
-      name: 'Subcurrent Owner',
-      role: 'admin',
-      passwordHash: await bcrypt.hash('changeme123', 12),
-    },
-  });
+  const existingOwner = await prisma.owner.findUnique({ where: { email: 'owner@subcurrent.app' } });
+  let owner = existingOwner;
+  if (!existingOwner) {
+    const pw = ownerPassword();
+    owner = await prisma.owner.create({
+      data: { email: 'owner@subcurrent.app', name: 'Subcurrent Owner', role: 'admin', passwordHash: await bcrypt.hash(pw.value, 12) },
+    });
+    if (pw.generated) {
+      fs.appendFileSync(
+        credsFile,
+        `# ${new Date().toISOString()} ${process.env.SEED_LABEL || 'seed'} (${String(process.env.DATABASE_URL || '').split('@').pop().split('?')[0]})\nemail=owner@subcurrent.app\npassword=${pw.value}\n\n`,
+        { mode: 0o600 }
+      );
+      console.log('Owner password generated and saved to .owner-credentials (not printed).');
+    }
+  }
 
   const artistData = [
     { key: 'bluetech', name: 'Bluetech', genre: 'Downtempo / bass', soundcloudUrl: 'https://soundcloud.com/bluetech' },
@@ -106,17 +125,41 @@ async function main() {
     });
   }
 
-  // One pinned team post so the shared feed isn't empty on a fresh database.
+  // The prototype's built-in feed posts, keyed by its ids (appKey) so the
+  // app's own like/comment/vote buttons map to real rows. Counts start at
+  // zero: only real interactions are stored. p8 is the prototype's example
+  // of a held resale post, so it starts in the moderation queue.
   if (!(await prisma.post.count())) {
-    await prisma.post.create({
-      data: {
-        ownerId: owner.id,
-        authorName: 'Subcurrent',
-        fromTeam: true,
-        pinned: true,
-        text: 'Welcome to the Subcurrent feed. Post about the shows, find your crew, and message the team here anytime.',
-      },
-    });
+    const H = 3600_000;
+    const now = Date.now();
+    const appPosts = [
+      { appKey: 'p1', by: 'Subcurrent', team: true, pinned: true, ago: 2, ev: 'ReturnalNights-Oct24', text: 'Re:Turnal Night Two is on the calendar. Members presale is open now with code SUBFAM. The location drops at 6 PM to ticket holders.', cms: [['Dev O.', 'Already locked in. See everyone on the rail.', 1], ['Lena F.', 'First SC afters for me!', 1.5]] },
+      { appKey: 'p2', by: 'Subterra Static', ago: 5, text: 'Dialed in a new downtempo pack for Saturday. If you hear the siren, get low. #ReturnalNights-Oct23', cms: [['Maya R.', 'THE SIREN. Say less.', 4]] },
+      { appKey: 'p3', by: 'Maya R.', ago: 9, text: 'Last weekend from the rail. That laser wall at 4 AM was something else.', cms: [['Jordan T.', 'We were right behind you', 8]] },
+      { appKey: 'p4', by: 'Subcurrent', team: true, ago: 26, text: 'Help us pick the theme for the December afters.', poll: ['Downtempo all night', 'Psybass takeover', 'Melodic sunrise set'], cms: [['Tasha G.', 'Psybass takeover or riot', 20]] },
+      { appKey: 'p5', by: 'Hollow Yeti', ago: 30, ev: 'HallowCurrentAfters', text: 'Denver, Hallow Current Afters is going to be loud. Bringing two unreleased tunes.', cms: [['Dev O.', 'Hollow Yeti at sunrise is the move', 29]] },
+      { appKey: 'p6', by: 'Jules P.', ago: 34, text: 'Door tip from the crew: have your ID out and your ticket open before you reach the line. We move a lot faster that way.', cms: [['Lena F.', 'Noted, thank you!', 33]] },
+      { appKey: 'p7', by: 'Dev O.', ago: 50, text: 'PSA from a 21-afters veteran: hydrate, bring earplugs, and say hi to the door crew. They work hard.', cms: [] },
+      { appKey: 'p8', by: 'Jordan T.', ago: 3, held: 'Possible ticket resale with a price', text: 'Selling 2 GA for Re:Turnal, $60 each, venmo me', cms: [] },
+    ];
+    for (const p of appPosts) {
+      await prisma.post.create({
+        data: {
+          appKey: p.appKey,
+          authorName: p.by,
+          fromTeam: Boolean(p.team),
+          ownerId: p.team ? owner.id : null,
+          pinned: Boolean(p.pinned),
+          eventSlug: p.ev,
+          text: p.text,
+          pollJson: p.poll ? JSON.stringify(p.poll) : null,
+          status: p.held ? 'held' : 'visible',
+          heldReason: p.held || null,
+          createdAt: new Date(now - p.ago * H),
+          comments: { create: p.cms.map(([name, text, ago]) => ({ authorName: name, text, createdAt: new Date(now - ago * H) })) },
+        },
+      });
+    }
   }
 
   console.log('Seeded:', { owner: owner.email, event: event.slug, artists: Object.keys(artists).length });

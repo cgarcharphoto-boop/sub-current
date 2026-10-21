@@ -3,3 +3,7 @@ test-results/
 .vercel/
 .vercel
 .env*
+
+# local-only secrets written by the seed script
+.owner-credentials
+.railway-link/

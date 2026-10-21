@@ -1,4 +1,5 @@
-process.env.DATABASE_URL = 'file:./test.db';
+// `npm run test:pg` supplies a Postgres URL; everything else uses SQLite.
+if (!/^postgres(ql)?:\/\//.test(process.env.DATABASE_URL || '')) process.env.DATABASE_URL = 'file:./test.db';
 process.env.JWT_SECRET = 'test-secret';
 process.env.NODE_ENV = 'test';
 

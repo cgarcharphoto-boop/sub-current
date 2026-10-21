@@ -8,3 +8,5 @@ dist/
 !prisma/template.db
 !prisma/template.db
 .env*
+.owner-credentials
+prisma/schema.postgres.prisma

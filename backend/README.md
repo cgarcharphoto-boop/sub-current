@@ -34,11 +34,22 @@ npm run dev                     # http://localhost:4000
 npm test                        # 15 tests, isolated test DB
 ```
 
-Seeded owner login: `owner@subcurrent.app` / `changeme123` — change before anything real touches the system.
+Owner login: `owner@subcurrent.app`. The password is never committed. The seed uses `OWNER_PASSWORD` if set, otherwise it generates a strong one and saves it to `.owner-credentials` at the repo root (git-ignored). Change it any time from the Live panel's Owner tab, which also signs out every other owner session.
 
 ## Deploying
 
-Same situation as cbh-backend: this is a stateful server, so the default SQLite setup only persists for the life of one Vercel serverless instance (`/tmp`, wiped on cold start). Deployed that way today — fine for a live demo, not for real production data. For real persistence: swap `DATABASE_URL` to a hosted Postgres and change `provider` in `prisma/schema.prisma`, or deploy as-is to an always-on host (Railway/Render/Fly) with a persistent volume.
+Vercel builds this folder on every push to `main`. The database mode follows `DATABASE_URL`:
+
+- **SQLite file URL (demo mode).** A pre-built database (`prisma/template.db`) is copied into `/tmp` on cold start. Zero setup, but data resets whenever the server sleeps.
+- **Postgres URL (permanent).** `scripts/prisma.js` switches Prisma to Postgres at build time. Same code, same tests (`npm run test:pg` runs the full suite against a local Postgres).
+
+To move production to Postgres in one step:
+
+```bash
+backend/scripts/go-postgres.sh 'postgresql://USER:PASS@HOST:PORT/DB'
+```
+
+It creates the tables, seeds the shows and owner account (password saved to `.owner-credentials`, git-ignored), sets `DATABASE_URL` on the Vercel project, and pushes an empty commit to rebuild.
 
 ## Connecting the front-end
 

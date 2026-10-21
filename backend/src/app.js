@@ -9,7 +9,8 @@ import { eventsRouter } from './routes/events.js';
 import { ticketsRouter } from './routes/tickets.js';
 import { ownerRouter } from './routes/owner.js';
 import { pushRouter } from './routes/push.js';
-import { feedRouter } from './routes/feed.js';
+import { feedRouter, moderationRouter } from './routes/feed.js';
+import { dmRouter } from './routes/dms.js';
 import { messagesRouter, inboxRouter } from './routes/messages.js';
 import { notFound, errorHandler } from './middleware/errors.js';
 import { paymentsLive } from './services/payments.js';
@@ -31,7 +32,9 @@ app.use(morgan(process.env.NODE_ENV === 'test' ? 'tiny' : 'dev'));
 
 // Generous overall ceiling plus a tight one on auth to blunt credential stuffing.
 app.use(rateLimit({ windowMs: 60_000, max: 300 }));
-app.use('/auth', rateLimit({ windowMs: 60_000, max: 20 }));
+// Tight limit only where passwords are checked or accounts are created.
+const credentialLimit = rateLimit({ windowMs: 60_000, max: 20 });
+app.use(['/auth/fan/login', '/auth/fan/signup', '/auth/fan/demo', '/auth/owner/login', '/auth/owner/password'], credentialLimit);
 
 app.get('/health', (req, res) =>
   res.json({
@@ -48,6 +51,8 @@ app.use('/push', pushRouter);
 app.use('/feed', feedRouter);
 app.use('/messages', messagesRouter);
 app.use('/owner/inbox', inboxRouter);
+app.use('/owner/moderation', moderationRouter);
+app.use('/dms', dmRouter);
 
 app.use(notFound);
 app.use(errorHandler);

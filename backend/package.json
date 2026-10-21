@@ -7,13 +7,15 @@
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
-    "pretest": "rm -f test.db && DATABASE_URL=file:./test.db npx prisma db push --skip-generate",
+    "pretest": "rm -f test.db prisma/test.db prisma/test.db-journal && DATABASE_URL=file:./test.db node scripts/prisma.js db push",
     "test": "vitest run",
-    "db:push": "prisma db push",
+    "db:push": "node scripts/prisma.js db push",
     "db:seed": "node prisma/seed.js",
     "db:studio": "prisma studio",
     "vapid:generate": "node scripts/generate-vapid.js",
-    "postinstall": "prisma generate"
+    "postinstall": "node scripts/prisma.js generate",
+    "db:setup": "node scripts/prisma.js db push && node prisma/seed.js",
+    "test:pg": "DATABASE_URL=${TEST_PG_URL:-postgresql://$USER@localhost:5432/subcurrent_test} sh -c 'node scripts/prisma.js generate && node scripts/prisma.js db push --force-reset --skip-generate --accept-data-loss && vitest run'"
   },
   "dependencies": {
     "@prisma/client": "^5.20.0",
