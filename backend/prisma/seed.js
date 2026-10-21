@@ -106,6 +106,19 @@ async function main() {
     });
   }
 
+  // One pinned team post so the shared feed isn't empty on a fresh database.
+  if (!(await prisma.post.count())) {
+    await prisma.post.create({
+      data: {
+        ownerId: owner.id,
+        authorName: 'Subcurrent',
+        fromTeam: true,
+        pinned: true,
+        text: 'Welcome to the Subcurrent feed. Post about the shows, find your crew, and message the team here anytime.',
+      },
+    });
+  }
+
   console.log('Seeded:', { owner: owner.email, event: event.slug, artists: Object.keys(artists).length });
 }
 

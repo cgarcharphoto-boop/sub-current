@@ -101,15 +101,15 @@
   function injectStyles() {
     var s = document.createElement('style');
     s.textContent = [
-      '#sc-pill{position:fixed;left:14px;bottom:14px;z-index:9998;font:600 12px/1 -apple-system,system-ui,sans-serif;background:#15101F;color:#EEE8FF;border:1px solid rgba(238,232,255,.26);border-radius:999px;padding:9px 14px;display:flex;align-items:center;gap:7px;box-shadow:0 8px 24px rgba(0,0,0,.45);cursor:pointer}',
+      '#sc-pill{position:fixed;left:14px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:9998;font:600 12px/1 -apple-system,system-ui,sans-serif;background:#15101F;color:#EEE8FF;border:1px solid rgba(238,232,255,.26);border-radius:999px;padding:9px 14px;display:flex;align-items:center;gap:7px;box-shadow:0 8px 24px rgba(0,0,0,.45);cursor:pointer}',
       '#sc-pill .dot{width:7px;height:7px;border-radius:50%;background:#4CC48D;box-shadow:0 0 8px #4CC48D}',
-      '#sc-panel{position:fixed;left:14px;bottom:58px;z-index:9999;width:min(380px,calc(100vw - 28px));max-height:min(620px,calc(100vh - 90px));overflow:auto;background:#0D0A14;color:#EEE8FF;border:1px solid rgba(238,232,255,.26);border-radius:16px;box-shadow:0 18px 48px rgba(0,0,0,.6);font:14px/1.45 -apple-system,system-ui,sans-serif;display:none}',
+      '#sc-panel{position:fixed;left:14px;bottom:calc(128px + env(safe-area-inset-bottom));z-index:9999;width:min(380px,calc(100vw - 28px));max-height:min(620px,calc(100vh - 150px));overflow:auto;background:#0D0A14;color:#EEE8FF;border:1px solid rgba(238,232,255,.26);border-radius:16px;box-shadow:0 18px 48px rgba(0,0,0,.6);font:14px/1.45 -apple-system,system-ui,sans-serif;display:none}',
       '#sc-panel.on{display:block}',
       '#sc-panel header{position:sticky;top:0;background:#0D0A14;padding:14px 16px 0;border-bottom:1px solid rgba(238,232,255,.12)}',
       '#sc-panel h2{font-size:15px;margin:0 0 10px;display:flex;align-items:center;gap:8px}',
       '#sc-panel h2 .x{margin-left:auto;background:none;border:0;color:#C4B5E6;font-size:20px;cursor:pointer;line-height:1}',
       '#sc-tabs{display:flex;gap:4px}',
-      '#sc-tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;color:#8C7FB3;padding:8px 0 10px;font:600 13px -apple-system,system-ui,sans-serif;cursor:pointer}',
+      '#sc-tabs{overflow-x:auto;scrollbar-width:none}#sc-tabs button{flex:1 0 auto;background:none;border:0;border-bottom:2px solid transparent;color:#8C7FB3;padding:8px 6px 10px;font:600 12px -apple-system,system-ui,sans-serif;cursor:pointer;white-space:nowrap}',
       '#sc-tabs button[aria-selected=true]{color:#EEE8FF;border-bottom-color:#C99BFF}',
       '#sc-body{padding:14px 16px 18px}',
       '#sc-body h3{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#8C7FB3;margin:16px 0 8px}',
@@ -134,6 +134,26 @@
       '#sc-body .stats div{background:#15101F;border-radius:10px;padding:10px;text-align:center}',
       '#sc-body .stats b{display:block;font-size:20px}',
       '#sc-body pre{white-space:pre-wrap;background:#15101F;border-radius:10px;padding:10px;font:12px ui-monospace,monospace;color:#C4B5E6}',
+      '#sc-body textarea{width:100%;box-sizing:border-box;background:#15101F;color:#EEE8FF;border:1px solid rgba(238,232,255,.26);border-radius:10px;padding:9px 10px;font:14px/1.4 -apple-system,system-ui,sans-serif;margin:0 0 8px;resize:vertical;min-height:64px}',
+      '#sc-body .post{background:#15101F;border:1px solid rgba(238,232,255,.12);border-radius:12px;padding:12px;margin:0 0 8px}',
+      '#sc-body .post.pin{border-color:#C99BFF}',
+      '#sc-body .who{display:flex;align-items:center;gap:6px;font-weight:700;margin:0 0 4px}',
+      '#sc-body .who .t{font:600 11px -apple-system,system-ui,sans-serif;color:#8C7FB3;margin-left:auto}',
+      '#sc-body .badge{font:700 10px/1 -apple-system,system-ui,sans-serif;background:#C99BFF;color:#040307;border-radius:6px;padding:3px 5px}',
+      '#sc-body .txt{white-space:pre-wrap;word-wrap:break-word;color:#EEE8FF;margin:0 0 8px}',
+      '#sc-body .acts{display:flex;gap:14px}',
+      '#sc-body .acts button{background:none;border:0;color:#C4B5E6;font:600 12px -apple-system,system-ui,sans-serif;cursor:pointer;padding:2px 0}',
+      '#sc-body .acts button.on{color:#FF6B85}',
+      '#sc-body .cms{margin-top:8px;border-top:1px solid rgba(238,232,255,.08);padding-top:8px}',
+      '#sc-body .cm{font-size:13px;margin:0 0 6px;color:#C4B5E6}#sc-body .cm b{color:#EEE8FF}',
+      '#sc-body .chat{display:flex;flex-direction:column;gap:6px;max-height:330px;overflow:auto;margin:0 0 8px;padding:2px}',
+      '#sc-body .bub{max-width:82%;padding:8px 11px;border-radius:14px;background:#15101F;white-space:pre-wrap;word-wrap:break-word;font-size:14px}',
+      '#sc-body .bub.me{align-self:flex-end;background:#C99BFF;color:#040307}',
+      '#sc-body .bub small{display:block;font-size:10px;opacity:.65;margin-top:3px}',
+      '#sc-body .th{display:flex;justify-content:space-between;gap:8px;width:100%;text-align:left;background:#15101F;border:1px solid rgba(238,232,255,.12);border-radius:12px;padding:10px 12px;margin:0 0 6px;color:#EEE8FF;cursor:pointer;font:14px -apple-system,system-ui,sans-serif}',
+      '#sc-body .th .n{background:#FF6B85;color:#fff;border-radius:999px;font:700 11px/1 -apple-system,system-ui,sans-serif;padding:4px 7px;align-self:center}',
+      '#sc-body label.ck{display:flex;align-items:center;gap:8px;font-size:13px;color:#C4B5E6;margin:0 0 8px}#sc-body label.ck input{width:auto;margin:0}',
+      '#sc-pill .n{background:#FF6B85;color:#fff;border-radius:999px;font:700 10px/1 -apple-system,system-ui,sans-serif;padding:3px 6px}',
       '#sc-toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,20px);z-index:10000;background:#15101F;color:#EEE8FF;border:1px solid #4CC48D;border-radius:12px;padding:10px 14px;font:600 13px -apple-system,system-ui,sans-serif;opacity:0;pointer-events:none;transition:.25s;max-width:calc(100vw - 40px)}',
       '#sc-toast.on{opacity:1;transform:translate(-50%,0)}#sc-toast.bad{border-color:#FF6B85}'
     ].join('');
@@ -165,6 +185,7 @@
     document.body.appendChild(pill);
     document.body.appendChild(t);
     panel.addEventListener('click', onPanelClick);
+    panel.addEventListener('keydown', onPanelKey);
   }
 
   function togglePanel(force) {
@@ -172,19 +193,20 @@
     var on = force != null ? force : !p.classList.contains('on');
     p.classList.toggle('on', on);
     $('#sc-pill').setAttribute('aria-expanded', String(on));
-    if (on) render(); else stopCodes();
+    if (on) render(); else { stopCodes(); stopPoll(); }
   }
 
   function render() {
     var p = $('#sc-panel');
     if (!p || !p.classList.contains('on')) return;
     stopCodes();
-    var tabs = [['tickets', 'Tickets'], ['door', 'Door'], ['owner', 'Owner'], ['status', 'Status']];
+    stopPoll();
+    var tabs = [['tickets', 'Tickets'], ['feed', 'Feed'], ['msgs', 'Messages'], ['door', 'Door'], ['owner', 'Owner'], ['status', 'Status']];
     p.innerHTML = '<header><h2><span style="width:8px;height:8px;border-radius:50%;background:#4CC48D;display:inline-block"></span>Live backend<button class="x" data-sc="close" aria-label="Close">×</button></h2>' +
       '<div id="sc-tabs" role="tablist">' + tabs.map(function (t) {
         return '<button role="tab" data-sc="tab" data-v="' + t[0] + '" aria-selected="' + (tab === t[0]) + '">' + t[1] + '</button>';
       }).join('') + '</div></header><div id="sc-body">Loading…</div>';
-    ({ tickets: renderTickets, door: renderDoor, owner: renderOwner, status: renderStatus })[tab]();
+    (({ tickets: renderTickets, feed: renderFeed, msgs: renderMsgs, door: renderDoor, owner: renderOwner, status: renderStatus })[tab] || renderTickets)();
   }
   function body(html) { var b = $('#sc-body'); if (b) b.innerHTML = html; }
 
@@ -328,7 +350,7 @@
     if (!owner) { body('<p>Sign in to see real sales, publish shows, and read flyers.</p>' + ownerLoginForm()); return; }
     body('<div class="kv"><span>Signed in as <b>' + esc(owner.name) + '</b></span><span class="muted">' + esc(owner.role) + '</span></div>' +
       '<h3>Dashboard</h3><div class="stats" id="sc-o-stats"><div><b>–</b>Fans</div><div><b>–</b>Shows live</div><div><b>–</b>Check-ins</div></div>' +
-      '<h3>Shows</h3><div id="sc-o-events">Loading…</div>' +
+      inboxHtml() + '<h3>Shows</h3><div id="sc-o-events">Loading\u2026</div>' +
       '<h3>Read a flyer</h3><p class="muted">' + (health && health.integrations.flyerAi ? 'Claude reads the flyer and fills in the show details.' : 'AI flyer reading is in sample mode until an Anthropic key is added.') + '</p>' +
       '<input id="sc-o-flyer" type="file" accept="image/*"><div id="sc-o-flyerres">' + (flyerResult ? '<pre>' + esc(JSON.stringify(flyerResult, null, 2)) + '</pre>' : '') + '</div>' +
       '<button class="b g" data-sc="owner-logout" style="margin-top:8px">Sign out</button>');
@@ -337,6 +359,8 @@
       if (el) el.innerHTML = '<div><b>' + d.fanCount + '</b>Fans</div><div><b>' + d.upcomingEvents + '</b>Shows live</div><div><b>' + d.totalCheckIns + '</b>Check-ins</div>';
     }).catch(function () {});
     loadOwnerEvents();
+    loadInbox();
+    startPoll(loadInbox, 5000);
     var f = $('#sc-o-flyer');
     if (f) f.onchange = function () { readFlyer(f.files[0]); };
   }
@@ -389,6 +413,197 @@
       '<p class="muted">API: ' + esc(API_BASE) + '</p>');
   }
 
+
+  // ---------- polling ----------
+  var pollTimer = null;
+  function startPoll(fn, ms) { stopPoll(); pollTimer = setInterval(fn, ms); }
+  function stopPoll() { if (pollTimer) clearInterval(pollTimer); pollTimer = null; }
+  function ago(d) {
+    var s = Math.max(0, (Date.now() - new Date(d).getTime()) / 1000);
+    if (s < 60) return 'now';
+    if (s < 3600) return Math.floor(s / 60) + 'm';
+    if (s < 86400) return Math.floor(s / 3600) + 'h';
+    return Math.floor(s / 86400) + 'd';
+  }
+  var SLUG_TITLE = { 'ReturnalNights-Oct23': 'Re:Turnal Night One', 'ReturnalNights-Oct24': 'Re:Turnal Night Two', HallowCurrentAfters: 'Hallow Current Afters', UndertowAfters: 'Undertow Afters' };
+
+  // ----- Feed tab -----
+  var feedPosts = [];
+  var openComments = {}; // postId -> true
+  function feedCall(path, opts) {
+    // Reads work signed out; a fan token adds liked/mine.
+    if (!opts && !fan) return api(path);
+    return fanApi(path, opts);
+  }
+  function renderFeed() {
+    var asTeam = Boolean(owner);
+    body('<h3>New post</h3><textarea id="sc-p-text" maxlength="1000" placeholder="Say something to the Subcurrent crowd"></textarea>' +
+      '<select id="sc-p-show"><option value="">No show tagged</option>' + Object.keys(SLUG_TITLE).map(function (k) { return '<option value="' + k + '">' + esc(SLUG_TITLE[k]) + '</option>'; }).join('') + '</select>' +
+      (asTeam ? '<label class="ck"><input type="checkbox" id="sc-p-team" checked> Post as Subcurrent (owner)</label><label class="ck"><input type="checkbox" id="sc-p-pin"> Pin to top</label><label class="ck"><input type="checkbox" id="sc-p-push"> Send push to all fans</label>' : '') +
+      '<button class="b" data-sc="post">Post</button>' +
+      '<p class="muted">' + (asTeam ? 'With the box checked, posts and comments go out as Subcurrent. Uncheck it to post as ' + esc(fan ? fan.name : 'the demo fan') + '.' : (!fan || fan.demo ? 'Posting as the demo fan, Alex R. Sign in on the Tickets tab to post as yourself.' : 'Posting as ' + esc(fan.name) + '.')) + '</p>' +
+      '<h3>Feed</h3><div id="sc-feed">Loading…</div>');
+    loadFeed();
+    startPoll(function () {
+      var a = document.activeElement;
+      if (a && a.closest && a.closest('#sc-feed')) return;
+      loadFeed(true);
+    }, 15000);
+  }
+  function loadFeed(quiet) {
+    return feedCall('/feed').then(function (d) {
+      feedPosts = d.posts;
+      drawFeed();
+    }).catch(function (e) { if (!quiet) { var el = $('#sc-feed'); if (el) el.innerHTML = '<p class="bad">' + esc(e.message) + '</p>'; } });
+  }
+  function drawFeed() {
+    var el = $('#sc-feed');
+    if (!el) return;
+    if (!feedPosts.length) { el.innerHTML = '<p class="muted">No posts yet. Start the conversation.</p>'; return; }
+    el.innerHTML = feedPosts.map(function (p) {
+      var canRemove = p.mine || Boolean(owner);
+      return '<div class="post' + (p.pinned ? ' pin' : '') + '" data-post="' + esc(p.id) + '">' +
+        '<div class="who">' + esc(p.author) + (p.fromTeam ? ' <span class="badge">TEAM</span>' : '') + (p.pinned ? ' <span class="muted">Pinned</span>' : '') + '<span class="t">' + ago(p.createdAt) + '</span></div>' +
+        '<div class="txt">' + esc(p.text) + '</div>' +
+        (p.eventSlug && SLUG_TITLE[p.eventSlug] ? '<p class="muted">' + esc(SLUG_TITLE[p.eventSlug]) + '</p>' : '') +
+        '<div class="acts"><button data-sc="like" data-v="' + esc(p.id) + '" class="' + (p.liked ? 'on' : '') + '" aria-pressed="' + p.liked + '">♥ ' + p.likes + '</button>' +
+        '<button data-sc="cms" data-v="' + esc(p.id) + '">Comments ' + p.comments + '</button>' +
+        (canRemove ? '<button data-sc="rmpost" data-v="' + esc(p.id) + '">Remove</button>' : '') + '</div>' +
+        (openComments[p.id] ? '<div class="cms" id="sc-cms-' + esc(p.id) + '">Loading…</div>' : '') + '</div>';
+    }).join('');
+    Object.keys(openComments).forEach(loadComments);
+  }
+  function loadComments(id) {
+    api('/feed/' + encodeURIComponent(id) + '/comments').then(function (list) {
+      var el = document.getElementById('sc-cms-' + id);
+      if (!el) return;
+      var draft = el.querySelector('input');
+      var keep = draft ? draft.value : '';
+      el.innerHTML = list.map(function (c) {
+        return '<p class="cm"><b>' + esc(c.author) + '</b>' + (c.fromTeam ? ' <span class="badge">TEAM</span>' : '') + ' ' + esc(c.text) + ' <span class="muted">' + ago(c.createdAt) + '</span></p>';
+      }).join('') + '<div class="row"><input data-cmin="' + esc(id) + '" maxlength="500" placeholder="Add a comment"><button class="b" style="flex:.35" data-sc="addcm" data-v="' + esc(id) + '">Send</button></div>';
+      if (keep) el.querySelector('input').value = keep;
+    }).catch(function () { delete openComments[id]; });
+  }
+  function postAs(text, slug, opts) {
+    opts = opts || {};
+    var payload = { text: text };
+    if (slug) payload.eventSlug = slug;
+    if (opts.team) {
+      payload.pinned = Boolean(opts.pin);
+      payload.notify = Boolean(opts.push);
+      return ownerApi('/feed', { method: 'POST', body: payload });
+    }
+    return fanApi('/feed', { method: 'POST', body: payload });
+  }
+
+  // ----- Messages tab (fan <-> Subcurrent team) -----
+  var fanUnread = 0, teamUnread = 0;
+  function bubbles(list, mineIsTeam) {
+    if (!list.length) return '<p class="muted">No messages yet.</p>';
+    return list.map(function (m) {
+      var me = mineIsTeam ? m.fromTeam : !m.fromTeam;
+      return '<div class="bub' + (me ? ' me' : '') + '">' + esc(m.text) + '<small>' + esc(me ? 'You' : m.author) + ' · ' + ago(m.createdAt) + '</small></div>';
+    }).join('');
+  }
+  function renderMsgs() {
+    body('<h3>Message the Subcurrent team</h3><p class="muted">Questions about tickets, entry, or the shows. The team answers from the owner portal.' +
+      (!fan || fan.demo ? ' You are the demo fan, Alex R. Sign in on the Tickets tab to message as yourself.' : '') + '</p>' +
+      '<div class="chat" id="sc-chat">Loading…</div>' +
+      '<div class="row"><input id="sc-m-in" maxlength="2000" placeholder="Write a message"><button class="b" style="flex:.35" data-sc="sendmsg">Send</button></div>');
+    loadChat();
+    startPoll(loadChat, 5000);
+    var inp = $('#sc-m-in');
+    if (inp) inp.onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); sendFanMsg(); } };
+  }
+  function loadChat() {
+    return fanApi('/messages').then(function (d) {
+      fanUnread = 0; badge();
+      var el = $('#sc-chat');
+      if (!el) return;
+      var atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+      el.innerHTML = bubbles(d.messages, false);
+      if (atBottom || d.unread) el.scrollTop = el.scrollHeight;
+    }).catch(function (e) { var el = $('#sc-chat'); if (el) el.innerHTML = '<p class="bad">' + esc(e.message) + '</p>'; });
+  }
+  function sendFanMsg() {
+    var inp = $('#sc-m-in');
+    var text = inp && inp.value.trim();
+    if (!text) return;
+    inp.value = '';
+    fanApi('/messages', { method: 'POST', body: { text: text } })
+      .then(function () { return loadChat(); })
+      .then(function () { var el = $('#sc-chat'); if (el) el.scrollTop = el.scrollHeight; })
+      .catch(function (e) { inp.value = text; toast('Message not sent: ' + e.message, true); });
+  }
+
+  // ----- Owner inbox -----
+  var inboxSel = null;
+  function inboxHtml() {
+    return '<h3>Inbox</h3><div id="sc-inbox">Loading…</div>';
+  }
+  function loadInbox() {
+    if (!owner) return Promise.resolve();
+    if (inboxSel) return loadInboxThread();
+    return ownerApi('/owner/inbox').then(function (list) {
+      teamUnread = list.reduce(function (n, t) { return n + t.unread; }, 0); badge();
+      var el = $('#sc-inbox');
+      if (!el) return;
+      el.innerHTML = list.length ? list.map(function (t) {
+        return '<button class="th" data-sc="openth" data-v="' + esc(t.id) + '"><span><b>' + esc(t.fan) + '</b><br><span class="muted">' + esc(t.last ? (t.last.fromTeam ? 'You: ' : '') + t.last.text.slice(0, 60) : '') + '</span></span>' +
+          (t.unread ? '<span class="n">' + t.unread + '</span>' : '<span class="muted">' + (t.last ? ago(t.last.createdAt) : '') + '</span>') + '</button>';
+      }).join('') : '<p class="muted">No conversations yet. Fans message the team from the Messages tab.</p>';
+    }).catch(function () {});
+  }
+  function loadInboxThread() {
+    return ownerApi('/owner/inbox/' + encodeURIComponent(inboxSel)).then(function (d) {
+      var el = $('#sc-inbox');
+      if (!el) return;
+      var chat = el.querySelector('.chat');
+      if (!chat) {
+        el.innerHTML = '<button class="b g" data-sc="closeth">← All conversations</button><p><b>' + esc(d.fan) + '</b></p><div class="chat"></div>' +
+          '<div class="row"><input id="sc-r-in" maxlength="2000" placeholder="Reply as Subcurrent"><button class="b" style="flex:.35" data-sc="reply">Send</button></div><p class="muted">Replies send a real push if the fan turned it on.</p>';
+        chat = el.querySelector('.chat');
+        var inp = $('#sc-r-in');
+        inp.onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); sendReply(); } };
+      }
+      var atBottom = chat.scrollHeight - chat.scrollTop - chat.clientHeight < 40;
+      chat.innerHTML = bubbles(d.messages, true);
+      if (atBottom) chat.scrollTop = chat.scrollHeight;
+      checkUnread();
+    }).catch(function (e) { inboxSel = null; toast(e.message, true); });
+  }
+  function sendReply() {
+    var inp = $('#sc-r-in');
+    var text = inp && inp.value.trim();
+    if (!text || !inboxSel) return;
+    inp.value = '';
+    ownerApi('/owner/inbox/' + encodeURIComponent(inboxSel), { method: 'POST', body: { text: text } })
+      .then(function (r) {
+        if (r.push && r.push.sent) toast('Sent. Push delivered to ' + r.push.sent + ' device' + (r.push.sent === 1 ? '' : 's') + '.');
+        return loadInboxThread();
+      })
+      .then(function () { var chat = $('#sc-inbox .chat'); if (chat) chat.scrollTop = chat.scrollHeight; })
+      .catch(function (e) { inp.value = text; toast('Reply not sent: ' + e.message, true); });
+  }
+
+  // ----- unread badge on the Live pill -----
+  function badge() {
+    var pill = $('#sc-pill');
+    if (!pill) return;
+    var n = fanUnread + teamUnread;
+    var el = pill.querySelector('.n');
+    if (!n) { if (el) el.remove(); pill.removeAttribute('aria-label'); return; }
+    if (!el) { el = document.createElement('span'); el.className = 'n'; pill.appendChild(el); }
+    el.textContent = n > 9 ? '9+' : String(n);
+    pill.setAttribute('aria-label', 'Live, ' + n + ' unread');
+  }
+  function checkUnread() {
+    if (document.hidden) return;
+    if (fan) api('/messages/unread', null, fan.token).then(function (d) { fanUnread = d.unread; badge(); }).catch(function () {});
+    if (owner) api('/owner/inbox', null, owner.token).then(function (l) { teamUnread = l.reduce(function (n, t) { return n + t.unread; }, 0); badge(); }).catch(function () {});
+  }
+
   // ---------- push ----------
   function urlBase64ToUint8Array(base64) {
     var pad = '='.repeat((4 - (base64.length % 4)) % 4);
@@ -408,6 +623,14 @@
 
   // ---------- panel clicks ----------
   function val(id) { var el = $('#' + id); return el ? el.value.trim() : ''; }
+  function onPanelKey(e) {
+    if (e.key !== 'Enter' || !e.target.getAttribute) return;
+    var id = e.target.getAttribute('data-cmin');
+    if (!id) return;
+    e.preventDefault();
+    var btn = document.querySelector('[data-sc="addcm"][data-v="' + id + '"]');
+    if (btn) btn.click();
+  }
   function onPanelClick(e) {
     var b = e.target.closest('[data-sc]');
     if (!b) return;
@@ -436,14 +659,14 @@
         .then(function (d) { fan = { token: d.token, name: d.fan.name, email: d.fan.email, demo: false }; save('fan', fan); toast((signup ? 'Account created. ' : '') + 'Signed in as ' + d.fan.name + '.'); render(); })
         .catch(function (err) { b.disabled = false; toast(err.status === 400 ? 'Check the email, and use a password of 8 or more characters.' : err.message, true); });
     }
-    if (act === 'fan-logout') { fan = null; save('fan', null); toast('Signed out. Back to the demo fan.'); return render(); }
+    if (act === 'fan-logout') { fan = null; save('fan', null); fanUnread = 0; badge(); toast('Signed out. Back to the demo fan.'); return render(); }
     if (act === 'owner-login') {
       b.disabled = true;
       return api('/auth/owner/login', { method: 'POST', body: { email: val('sc-o-email'), password: $('#sc-o-pass').value } })
         .then(function (d) { owner = { token: d.token, name: d.owner.name, role: d.owner.role }; save('owner', owner); toast('Signed in as ' + d.owner.name + '.'); render(); })
         .catch(function (err) { b.disabled = false; toast(err.status === 400 ? 'Enter an email and password.' : err.message, true); });
     }
-    if (act === 'owner-logout') { owner = null; save('owner', null); return render(); }
+    if (act === 'owner-logout') { owner = null; save('owner', null); inboxSel = null; teamUnread = 0; badge(); return render(); }
     if (act === 'scan') return doScan(val('sc-d-pass'));
     if (act === 'scanmine') {
       return fanApi('/tickets/mine').then(function (list) {
@@ -457,6 +680,47 @@
       }).catch(function (err) { toast(err.message, true); });
     }
     if (act === 'publish') { b.disabled = true; return publish(v); }
+    if (act === 'post') {
+      var text = val('sc-p-text');
+      if (!text) return toast('Write something first.', true);
+      var team = $('#sc-p-team') && $('#sc-p-team').checked;
+      b.disabled = true;
+      return postAs(text, val('sc-p-show'), { team: team, pin: $('#sc-p-pin') && $('#sc-p-pin').checked, push: $('#sc-p-push') && $('#sc-p-push').checked })
+        .then(function (r) {
+          $('#sc-p-text').value = '';
+          toast('Posted to the live feed' + (r.push && r.push.sent ? '. Push sent to ' + r.push.sent + ' device' + (r.push.sent === 1 ? '' : 's') + '.' : '.'));
+          return loadFeed();
+        })
+        .catch(function (err) { toast('Post failed: ' + err.message, true); })
+        .then(function () { b.disabled = false; });
+    }
+    if (act === 'like') {
+      return fanApi('/feed/' + encodeURIComponent(v) + '/like', { method: 'POST' }).then(function (r) {
+        feedPosts.forEach(function (p) { if (p.id === v) { p.liked = r.liked; p.likes = r.likes; } });
+        b.className = r.liked ? 'on' : ''; b.setAttribute('aria-pressed', String(r.liked)); b.textContent = '♥ ' + r.likes;
+      }).catch(function (err) { toast(err.message, true); });
+    }
+    if (act === 'cms') { if (openComments[v]) delete openComments[v]; else openComments[v] = true; return drawFeed(); }
+    if (act === 'addcm') {
+      var inp = document.querySelector('[data-cmin="' + v + '"]');
+      var t = inp && inp.value.trim();
+      if (!t) return;
+      var asOwner = owner && $('#sc-p-team') && $('#sc-p-team').checked;
+      (asOwner ? ownerApi : fanApi)('/feed/' + encodeURIComponent(v) + '/comments', { method: 'POST', body: { text: t } })
+        .then(function () { inp.value = ''; return loadFeed(true); })
+        .catch(function (err) { toast('Comment failed: ' + err.message, true); });
+      return;
+    }
+    if (act === 'rmpost') {
+      var mine = feedPosts.filter(function (p) { return p.id === v; })[0];
+      return (mine && mine.mine ? fanApi : ownerApi)('/feed/' + encodeURIComponent(v), { method: 'DELETE' })
+        .then(function () { delete openComments[v]; toast('Post removed.'); return loadFeed(); })
+        .catch(function (err) { toast(err.message, true); });
+    }
+    if (act === 'sendmsg') return sendFanMsg();
+    if (act === 'openth') { inboxSel = v; var box = $('#sc-inbox'); if (box) box.innerHTML = 'Loading…'; return loadInboxThread().then(function () { var c = $('#sc-inbox .chat'); if (c) c.scrollTop = c.scrollHeight; }); }
+    if (act === 'closeth') { inboxSel = null; return loadInbox(); }
+    if (act === 'reply') return sendReply();
   }
 
   // ---------- hooks into the app's own buttons ----------
@@ -491,6 +755,35 @@
       }).catch(function () {});
     }
 
+    // Fan composer "Post": mirror the text to the real shared feed.
+    if (act === 'post') {
+      var cp = document.getElementById('cpText');
+      var ptext = cp && cp.value.trim();
+      var pshow = document.getElementById('cpShow');
+      if (ptext) {
+        postAs(ptext, EVENT_SLUG[pshow && pshow.value] || null)
+          .then(function () { toast('Also posted to the live feed. Everyone using the app can see it.'); if (tab === 'feed') loadFeed(true); })
+          .catch(function (err) { toast('Live feed post failed: ' + err.message, true); });
+      }
+    }
+
+    // Owner portal feed "Post": with an owner signed in, post as Subcurrent
+    // for real, honoring the Pin and Push switches.
+    if (act === 'ofpost' && owner) {
+      var of = document.getElementById('ofText');
+      var otext = of && of.value.trim();
+      if (otext) {
+        var oshow = document.getElementById('ofShow');
+        postAs(otext, EVENT_SLUG[oshow && oshow.value] || null, {
+          team: true,
+          pin: document.getElementById('ofPin') && document.getElementById('ofPin').checked,
+          push: document.getElementById('ofPush') && document.getElementById('ofPush').checked
+        }).then(function (r) {
+          toast('Posted to the live feed as Subcurrent' + (r.push && r.push.sent ? '. Real push sent to ' + r.push.sent + ' device' + (r.push.sent === 1 ? '' : 's') + '.' : '.'));
+        }).catch(function (err) { toast('Live feed post failed: ' + err.message, true); });
+      }
+    }
+
     // "My tickets" in the app: nudge toward the real ones.
     if (act === 'viewtickets' || (act === 'tab' && b.getAttribute('data-v') === 'tickets')) {
       fanApi('/tickets/mine').then(function (list) {
@@ -499,7 +792,20 @@
     }
   }, true);
 
-  // Replace the app's simulated "N left" with real remaining counts whenever
+  // The app's chat with Subcurrent (thread "th-cbh") also goes to the real
+  // team inbox. Other app chats are with demo people and stay simulated.
+  document.addEventListener('submit', function (e) {
+    var f = e.target;
+    if (!health || !f.matches || !f.matches('form[data-form="sendmsg"][data-v="th-cbh"]')) return;
+    var inp = f.querySelector('input.input');
+    var text = inp && inp.value.trim();
+    if (!text) return;
+    fanApi('/messages', { method: 'POST', body: { text: text } })
+      .then(function () { toast('Delivered to the real Subcurrent inbox. Replies show under Live, then Messages.'); })
+      .catch(function (err) { toast('Real message failed: ' + err.message, true); });
+  }, true);
+
+  // Replace the app's simulated "N left\" with real remaining counts whenever
   // the checkout sheet renders.
   function syncSheetInventory() {
     if (!health) return;
@@ -531,6 +837,8 @@
       health = h;
       mount();
       new MutationObserver(function () { syncSheetInventory(); }).observe(document.body, { childList: true, subtree: true });
+      checkUnread();
+      setInterval(checkUnread, 30000);
     })
     .catch(function () { /* backend unreachable: stay invisible, app runs as a pure prototype */ });
 })();

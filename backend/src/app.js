@@ -9,6 +9,8 @@ import { eventsRouter } from './routes/events.js';
 import { ticketsRouter } from './routes/tickets.js';
 import { ownerRouter } from './routes/owner.js';
 import { pushRouter } from './routes/push.js';
+import { feedRouter } from './routes/feed.js';
+import { messagesRouter, inboxRouter } from './routes/messages.js';
 import { notFound, errorHandler } from './middleware/errors.js';
 import { paymentsLive } from './services/payments.js';
 import { smsLive } from './services/sms.js';
@@ -43,6 +45,9 @@ app.use('/events', eventsRouter);
 app.use('/tickets', ticketsRouter);
 app.use('/owner', ownerRouter);
 app.use('/push', pushRouter);
+app.use('/feed', feedRouter);
+app.use('/messages', messagesRouter);
+app.use('/owner/inbox', inboxRouter);
 
 app.use(notFound);
 app.use(errorHandler);

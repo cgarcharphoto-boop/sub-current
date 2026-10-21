@@ -34,6 +34,7 @@ export async function notifyFan(fanId, payload) {
 }
 
 export async function notifyAllFans(payload) {
+  if (!pushConfigured) return { ok: false, reason: 'VAPID keys not configured' };
   const subs = await prisma.pushSubscription.findMany();
   const results = await Promise.allSettled(
     subs.map((s) =>
