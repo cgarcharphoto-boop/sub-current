@@ -1,0 +1,7 @@
+Here's the Subcurrent app prototype, built around Re:Turnal Nights: https://thedude0007.github.io/subcurrent-app-prototype/
+
+Add it to your home screen so it opens like an app:
+iPhone: open the link in Safari, tap Share (the square with the arrow), then Add to Home Screen, then Add.
+Android: open the link in Chrome, tap the ⋮ menu, then Add to Home screen (or Install app).
+
+Then open it from the Subcurrent icon. Tap Owner portal at the top to see the money side.
