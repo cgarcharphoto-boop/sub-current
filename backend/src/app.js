@@ -1,0 +1,48 @@
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import morgan from 'morgan';
+import rateLimit from 'express-rate-limit';
+import { env } from './env.js';
+import { authRouter } from './routes/auth.js';
+import { eventsRouter } from './routes/events.js';
+import { ticketsRouter } from './routes/tickets.js';
+import { ownerRouter } from './routes/owner.js';
+import { pushRouter } from './routes/push.js';
+import { notFound, errorHandler } from './middleware/errors.js';
+import { paymentsLive } from './services/payments.js';
+import { smsLive } from './services/sms.js';
+import { flyerAiLive } from './services/flyerAI.js';
+import { pushConfigured } from './services/push.js';
+
+export const app = express();
+
+app.use(helmet());
+app.use(
+  cors({
+    origin: env.corsOrigins.length ? env.corsOrigins : true,
+    credentials: true,
+  })
+);
+app.use(express.json({ limit: '8mb' })); // flyer photos ride in as base64
+app.use(morgan(process.env.NODE_ENV === 'test' ? 'tiny' : 'dev'));
+
+// Generous overall ceiling plus a tight one on auth to blunt credential stuffing.
+app.use(rateLimit({ windowMs: 60_000, max: 300 }));
+app.use('/auth', rateLimit({ windowMs: 60_000, max: 20 }));
+
+app.get('/health', (req, res) =>
+  res.json({
+    ok: true,
+    integrations: { payments: paymentsLive, sms: smsLive, flyerAi: flyerAiLive, push: pushConfigured },
+  })
+);
+
+app.use('/auth', authRouter);
+app.use('/events', eventsRouter);
+app.use('/tickets', ticketsRouter);
+app.use('/owner', ownerRouter);
+app.use('/push', pushRouter);
+
+app.use(notFound);
+app.use(errorHandler);

@@ -1,0 +1,156 @@
+// SQLite by default — zero-config, real persistence, runs anywhere.
+// To move to Postgres later: change provider to "postgresql" and set
+// DATABASE_URL to a real connection string. No other code changes needed —
+// that's the entire point of using Prisma here.
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Fan {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  phone        String?  @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime @default(now())
+  tickets      Ticket[]
+  orders       Order[]
+  pushSubs     PushSubscription[]
+  smsOptIn     Boolean  @default(false)
+}
+
+model Owner {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         String   @default("staff") // "staff" | "admin"
+  createdAt    DateTime @default(now())
+}
+
+model Artist {
+  id        String   @id @default(cuid())
+  name      String
+  genre     String?
+  soundcloudUrl String?
+  slots     LineupSlot[]
+}
+
+model Event {
+  id          String   @id @default(cuid())
+  title       String
+  slug        String   @unique
+  status      String   @default("draft") // draft | announced | on_sale | sold_out | past
+  startAt     DateTime
+  doorsAt     DateTime
+  venueName   String?
+  venueAddr   String?
+  revealMode  String   @default("checkout") // "checkout" | "timed"
+  dropAt      DateTime?
+  multipassSlug String? // when set, ticketing is bridged to Multipass instead of native checkout
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  tiers       Tier[]
+  lineup      LineupSlot[]
+  tickets     Ticket[]
+  drops       LocationDrop[]
+}
+
+model LineupSlot {
+  id        String  @id @default(cuid())
+  event     Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  eventId   String
+  artist    Artist  @relation(fields: [artistId], references: [id])
+  artistId  String
+  startTime DateTime
+  sortOrder Int     @default(0)
+
+  @@index([eventId])
+}
+
+model Tier {
+  id        String   @id @default(cuid())
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  eventId   String
+  name      String
+  priceCents Int
+  capacity  Int
+  soldCount Int      @default(0)
+  salesOpen Boolean  @default(true)
+
+  @@index([eventId])
+}
+
+model Order {
+  id            String   @id @default(cuid())
+  fan           Fan      @relation(fields: [fanId], references: [id])
+  fanId         String
+  totalCents    Int
+  status        String   @default("pending") // pending | paid | refunded | failed
+  paymentRef    String?  // Stripe PaymentIntent id once real payments are wired in
+  createdAt     DateTime @default(now())
+  tickets       Ticket[]
+
+  @@index([fanId])
+}
+
+model Ticket {
+  id          String   @id @default(cuid())
+  event       Event    @relation(fields: [eventId], references: [id])
+  eventId     String
+  fan         Fan      @relation(fields: [fanId], references: [id])
+  fanId       String
+  order       Order?   @relation(fields: [orderId], references: [id])
+  orderId     String?
+  tierName    String
+  holderName  String
+  qrSecret    String   // per-ticket secret seed for the rotating TOTP-style code
+  source      String   @default("native") // "native" | "multipass"
+  checkedInAt DateTime?
+  createdAt   DateTime @default(now())
+  scans       ScanLog[]
+
+  @@index([eventId])
+  @@index([fanId])
+}
+
+model ScanLog {
+  id        String   @id @default(cuid())
+  ticket    Ticket   @relation(fields: [ticketId], references: [id])
+  ticketId  String
+  result    String   // "valid" | "already_used" | "wrong_event" | "invalid_code"
+  scannedBy String?  // owner id
+  scannedAt DateTime @default(now())
+
+  @@index([ticketId])
+}
+
+model LocationDrop {
+  id        String   @id @default(cuid())
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  eventId   String
+  venueName String
+  address   String
+  entryNote String?
+  revealAt  DateTime
+  revealed  Boolean  @default(false)
+
+  @@index([eventId])
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  fan       Fan      @relation(fields: [fanId], references: [id], onDelete: Cascade)
+  fanId     String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+
+  @@index([fanId])
+}

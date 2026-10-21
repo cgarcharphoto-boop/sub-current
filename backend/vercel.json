@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/index.js",
+      "use": "@vercel/node",
+      "config": { "includeFiles": ["prisma/template.db"] }
+    }
+  ],
+  "rewrites": [{ "source": "/(.*)", "destination": "/api/index.js" }]
+}
