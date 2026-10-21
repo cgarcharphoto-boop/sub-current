@@ -100,6 +100,28 @@ ownerRouter.post(
   })
 );
 
+// ---- all events, drafts included (public /events hides drafts) ----
+ownerRouter.get(
+  '/events',
+  requireOwner,
+  asyncRoute(async (req, res) => {
+    const events = await prisma.event.findMany({
+      orderBy: { startAt: 'asc' },
+      include: { tiers: true },
+    });
+    res.json(
+      events.map((e) => ({
+        id: e.id,
+        slug: e.slug,
+        title: e.title,
+        status: e.status,
+        startAt: e.startAt,
+        tiers: e.tiers.map((t) => ({ id: t.id, name: t.name, priceCents: t.priceCents, sold: t.soldCount, capacity: t.capacity })),
+      }))
+    );
+  })
+);
+
 // ---- dashboard ----
 ownerRouter.get(
   '/dashboard',
