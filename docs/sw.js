@@ -2,7 +2,7 @@
 // Network-first for HTML (this is under active development, don't trap people
 // on a stale build), cache fallback for offline / flaky connections.
 const CACHE = 'subcurrent-shell-v3';
-const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png', './favicon.png'];
+const SHELL = ['./', './index.html', './connect.js', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png', './favicon.png'];
 
 self.addEventListener('install', (e) => {
   self.skipWaiting();
